@@ -15,6 +15,6 @@ public interface OrderJpaRepository extends JpaRepository<Order, Long> {
             "WHERE o.id = :orderId AND o.userId = :userId")
     Optional<Order> findByIdAndUserId(@Param("orderId") Long orderId, @Param("userId") String userId);
 
-    @Query("SELECT o FROM Order o WHERE o.userId = :userId ORDER BY o.createdAt DESC")
+    @Query("SELECT o FROM Order o JOIN FETCH o.orderItems WHERE o.userId = :userId ORDER BY o.createdAt DESC")
     List<Order> findAllByUserId(@Param("userId") String userId);
 }

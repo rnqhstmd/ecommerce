@@ -4,6 +4,8 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
 import java.util.List;
@@ -17,6 +19,12 @@ public class StockDeductionService {
 
     private final ProductService productService;
 
+    /**
+     * 재고 차감 도메인 서비스.
+     * 반드시 기존 트랜잭션 내에서 호출되어야 합니다 (MANDATORY).
+     * 비관적 락은 ProductJpaRepository에서 ID 오름차순(ORDER BY p.id ASC)으로 획득하여 데드락을 방지합니다.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
     public List<Product> deductStock(List<StockDeductionCommand> commands) {
         List<Long> sortedProductIds = commands.stream()
                 .map(StockDeductionCommand::productId)
