@@ -57,7 +57,7 @@ class StockConcurrencyTest {
 
         // 11명의 사용자 생성 및 포인트 충전
         for (int i = 1; i <= 11; i++) {
-            String userId = String.format("stockuser%02d", i);
+            String userId = String.format("stku%02d", i);
             userService.signUp(userId, userId + "@mail.com", "1990-01-01", Gender.MALE);
             pointService.chargePoint(userId, 100000L);
         }
@@ -78,7 +78,7 @@ class StockConcurrencyTest {
         AtomicInteger failCount = new AtomicInteger(0);
 
         for (int i = 1; i <= threadCount; i++) {
-            String userId = String.format("stockuser%02d", i);
+            String userId = String.format("stku%02d", i);
             executorService.submit(() -> {
                 try {
                     OrderPlaceCommand command = new OrderPlaceCommand(
