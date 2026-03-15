@@ -1,9 +1,5 @@
 package com.loopers.domain.order;
 
-import com.loopers.domain.brand.Brand;
-import com.loopers.domain.product.Product;
-import com.loopers.domain.user.Gender;
-import com.loopers.domain.user.User;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,40 +16,34 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class OrderTest {
 
-    private User dummyUser;
-    private Product dummyProduct1;
-    private Product dummyProduct2;
+    private String dummyUserId;
 
     @BeforeEach
     void setUp() {
-        // 테스트에 필요한 User, Product (및 Brand) 더미 객체 생성
-        dummyUser = User.create("testuser", "test@mail.com", "1990-01-01", Gender.MALE);
-        Brand dummyBrand = Brand.create("Dummy Brand");
-        dummyProduct1 = Product.create("Product A", 1000L, 10, dummyBrand);
-        dummyProduct2 = Product.create("Product B", 2000L, 10, dummyBrand);
+        dummyUserId = "testuser";
     }
 
     @Nested
     @DisplayName("주문 생성 (Order.create)")
     class CreateOrder {
 
-        @DisplayName("사용자로 주문을 생성할 수 있다.")
+        @DisplayName("사용자 ID로 주문을 생성할 수 있다.")
         @Test
         void createOrder() {
             // act
-            Order order = Order.create(dummyUser);
+            Order order = Order.create(dummyUserId);
 
             // assert
-            assertThat(order.getUser()).isEqualTo(dummyUser);
+            assertThat(order.getUserId()).isEqualTo(dummyUserId);
             assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);
             assertThat(order.getTotalAmountValue()).isZero();
             assertThat(order.getOrderItems()).isEmpty();
             assertThat(order.getPaidAt()).isNull();
         }
 
-        @DisplayName("사용자가 null이면 BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("사용자 ID가 null이면 BAD_REQUEST 예외가 발생한다.")
         @Test
-        void throwsException_whenUserIsNull() {
+        void throwsException_whenUserIdIsNull() {
             // act & assert
             assertThatThrownBy(() -> Order.create(null))
                     .isInstanceOf(CoreException.class)
@@ -70,26 +60,26 @@ class OrderTest {
         @Test
         void addOrderItem() {
             // arrange
-            Order order = Order.create(dummyUser);
+            Order order = Order.create(dummyUserId);
 
             // act
-            order.addOrderItem(dummyProduct1, 2); // 1000 * 2 = 2000
-            order.addOrderItem(dummyProduct2, 1); // 2000 * 1 = 2000
+            order.addOrderItem(1L, "Product A", 1000L, 2); // 1000 * 2 = 2000
+            order.addOrderItem(2L, "Product B", 2000L, 1); // 2000 * 1 = 2000
 
             // assert
             assertThat(order.getOrderItems()).hasSize(2);
             assertThat(order.getTotalAmountValue()).isEqualTo(4000L);
-            assertThat(order.getOrderItems().get(0).getUnitPriceValue()).isEqualTo(1000L); // 가격 스냅샷 확인
+            assertThat(order.getOrderItems().get(0).getUnitPriceValue()).isEqualTo(1000L);
         }
 
-        @DisplayName("상품이 null이면 BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("상품 ID가 null이면 BAD_REQUEST 예외가 발생한다.")
         @Test
-        void throwsException_whenProductIsNull() {
+        void throwsException_whenProductIdIsNull() {
             // arrange
-            Order order = Order.create(dummyUser);
+            Order order = Order.create(dummyUserId);
 
             // act & assert
-            assertThatThrownBy(() -> order.addOrderItem(null, 1))
+            assertThatThrownBy(() -> order.addOrderItem(null, "Product", 1000L, 1))
                     .isInstanceOf(CoreException.class)
                     .extracting(ex -> ((CoreException) ex).getErrorType())
                     .isEqualTo(ErrorType.BAD_REQUEST);
@@ -100,10 +90,10 @@ class OrderTest {
         @ValueSource(ints = {0, -1})
         void throwsException_whenQuantityIsInvalid(int invalidQuantity) {
             // arrange
-            Order order = Order.create(dummyUser);
+            Order order = Order.create(dummyUserId);
 
             // act & assert
-            assertThatThrownBy(() -> order.addOrderItem(dummyProduct1, invalidQuantity))
+            assertThatThrownBy(() -> order.addOrderItem(1L, "Product A", 1000L, invalidQuantity))
                     .isInstanceOf(CoreException.class)
                     .extracting(ex -> ((CoreException) ex).getErrorType())
                     .isEqualTo(ErrorType.BAD_REQUEST);
@@ -118,8 +108,8 @@ class OrderTest {
         @Test
         void completePayment() {
             // arrange
-            Order order = Order.create(dummyUser);
-            order.addOrderItem(dummyProduct1, 1);
+            Order order = Order.create(dummyUserId);
+            order.addOrderItem(1L, "Product A", 1000L, 1);
             ZonedDateTime beforePayment = ZonedDateTime.now().minusSeconds(1);
 
             // act
@@ -134,7 +124,7 @@ class OrderTest {
         @Test
         void throwsException_whenItemsAreEmpty() {
             // arrange
-            Order order = Order.create(dummyUser);
+            Order order = Order.create(dummyUserId);
 
             // act & assert
             assertThatThrownBy(order::completePayment)

@@ -1,12 +1,11 @@
 package com.loopers.domain.product;
 
-import com.loopers.domain.brand.Brand;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -15,11 +14,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ProductTest {
 
-    private Brand dummyBrand;
+    private Long dummyBrandId;
 
     @BeforeEach
     void setUp() {
-        dummyBrand = Brand.create("Dummy Brand");
+        dummyBrandId = 1L;
     }
 
     @Nested
@@ -30,13 +29,13 @@ class ProductTest {
         @Test
         void createProduct() {
             // act
-            Product product = Product.create("Test Product", 15000L, 50, dummyBrand);
+            Product product = Product.create("Test Product", 15000L, 50, dummyBrandId);
 
             // assert
             assertThat(product.getName()).isEqualTo("Test Product");
             assertThat(product.getPriceValue()).isEqualTo(15000L);
             assertThat(product.getStockValue()).isEqualTo(50);
-            assertThat(product.getBrand()).isEqualTo(dummyBrand);
+            assertThat(product.getBrandId()).isEqualTo(dummyBrandId);
         }
 
         @DisplayName("상품명이 null이거나 공백이면 BAD_REQUEST 예외가 발생한다.")
@@ -44,7 +43,7 @@ class ProductTest {
         @ValueSource(strings = {"", "   "})
         void throwsException_whenNameIsBlank(String invalidName) {
             // act & assert
-            assertThatThrownBy(() -> Product.create(invalidName, 1000L, 10, dummyBrand))
+            assertThatThrownBy(() -> Product.create(invalidName, 1000L, 10, dummyBrandId))
                     .isInstanceOf(CoreException.class)
                     .extracting(ex -> ((CoreException) ex).getErrorType())
                     .isEqualTo(ErrorType.BAD_REQUEST);
@@ -54,7 +53,7 @@ class ProductTest {
         @Test
         void throwsException_whenPriceIsNull() {
             // act & assert
-            assertThatThrownBy(() -> Product.create("Test", null, 10, dummyBrand))
+            assertThatThrownBy(() -> Product.create("Test", null, 10, dummyBrandId))
                     .isInstanceOf(CoreException.class)
                     .extracting(ex -> ((CoreException) ex).getErrorType())
                     .isEqualTo(ErrorType.BAD_REQUEST);
@@ -64,7 +63,7 @@ class ProductTest {
         @Test
         void throwsException_whenPriceIsNegative() {
             // act & assert
-            assertThatThrownBy(() -> Product.create("Test", -10L, 10, dummyBrand))
+            assertThatThrownBy(() -> Product.create("Test", -10L, 10, dummyBrandId))
                     .isInstanceOf(CoreException.class)
                     .extracting(ex -> ((CoreException) ex).getErrorType())
                     .isEqualTo(ErrorType.BAD_REQUEST);
@@ -74,7 +73,7 @@ class ProductTest {
         @Test
         void throwsException_whenStockIsNull() {
             // act & assert
-            assertThatThrownBy(() -> Product.create("Test", 1000L, null, dummyBrand))
+            assertThatThrownBy(() -> Product.create("Test", 1000L, null, dummyBrandId))
                     .isInstanceOf(CoreException.class)
                     .extracting(ex -> ((CoreException) ex).getErrorType())
                     .isEqualTo(ErrorType.BAD_REQUEST);
@@ -84,7 +83,7 @@ class ProductTest {
         @Test
         void throwsException_whenStockIsNegative() {
             // act & assert
-            assertThatThrownBy(() -> Product.create("Test", 1000L, -1, dummyBrand))
+            assertThatThrownBy(() -> Product.create("Test", 1000L, -1, dummyBrandId))
                     .isInstanceOf(CoreException.class)
                     .extracting(ex -> ((CoreException) ex).getErrorType())
                     .isEqualTo(ErrorType.BAD_REQUEST);
@@ -99,7 +98,7 @@ class ProductTest {
 
         @BeforeEach
         void setUp() {
-            product = Product.create("Test Product", 1000L, 10, dummyBrand);
+            product = Product.create("Test Product", 1000L, 10, 1L);
         }
 
         @DisplayName("재고를 차감할 수 있다.")

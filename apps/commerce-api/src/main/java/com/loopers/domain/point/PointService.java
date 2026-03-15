@@ -27,16 +27,21 @@ public class PointService {
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "포인트를 찾을 수 없습니다."));
     }
 
+    private Point getPointWithLock(String userId) {
+        return pointRepository.findByUserIdWithLock(userId)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "포인트를 찾을 수 없습니다."));
+    }
+
     @Transactional
     public void chargePoint(String userId, Long amount) {
-        Point point = getPoint(userId);
+        Point point = getPointWithLock(userId);
         point.charge(amount);
         pointRepository.save(point);
     }
 
     @Transactional
     public void usePoint(String userId, Long amount) {
-        Point point = getPoint(userId);
+        Point point = getPointWithLock(userId);
         point.use(amount);
         pointRepository.save(point);
     }

@@ -35,7 +35,6 @@ public record ProductListInfo(
             String name,
             Long price,
             Long brandId,
-            String brandName,
             Long likeCount
     ) {
         public static ProductContent of(Product product, Long likeCount) {
@@ -43,8 +42,7 @@ public record ProductListInfo(
                     product.getId(),
                     product.getName(),
                     product.getPriceValue(),
-                    product.getBrand().getId(),
-                    product.getBrand().getName(),
+                    product.getBrandId(),
                     likeCount
             );
         }

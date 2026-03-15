@@ -1,15 +1,14 @@
 package com.loopers.application.order;
 
 import com.loopers.domain.order.Order;
+import com.loopers.domain.order.OrderPlacedEvent;
 import com.loopers.domain.order.OrderService;
 import com.loopers.domain.point.PointService;
 import com.loopers.domain.product.Product;
-import com.loopers.domain.product.ProductService;
-import com.loopers.domain.user.User;
-import com.loopers.domain.user.UserService;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
+import com.loopers.domain.product.StockDeductionService;
+import com.loopers.domain.product.StockDeductionService.StockDeductionCommand;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,64 +23,55 @@ import java.util.stream.Collectors;
 public class OrderFacade {
 
     private final OrderService orderService;
-    private final UserService userService;
-    private final ProductService productService;
+    private final StockDeductionService stockDeductionService;
     private final PointService pointService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public OrderInfo placeOrder(OrderPlaceCommand command) {
-        User user = userService.getUserByUserId(command.userId());
-
-        List<Long> productIds = command.items().stream()
-                .map(OrderPlaceCommand.OrderItemCommand::productId)
+        List<StockDeductionCommand> deductionCommands = command.items().stream()
+                .map(item -> new StockDeductionCommand(item.productId(), item.quantity()))
                 .toList();
 
-        List<Product> products = productService.getProductsByIds(productIds);
+        List<Product> products = stockDeductionService.deductStock(deductionCommands);
         Map<Long, Product> productMap = products.stream()
                 .collect(Collectors.toMap(Product::getId, Function.identity()));
 
-        validateAndDecreaseStock(command.items(), productMap);
-
-        Order order = Order.create(user);
+        Order order = Order.create(command.userId());
 
         for (OrderPlaceCommand.OrderItemCommand item : command.items()) {
             Product product = productMap.get(item.productId());
-            order.addOrderItem(product, item.quantity());
+            order.addOrderItem(product.getId(), product.getName(), product.getPriceValue(), item.quantity());
         }
 
         Long totalAmount = order.getTotalAmountValue();
-        pointService.usePoint(user.getUserIdValue(), totalAmount);
+        pointService.usePoint(command.userId(), totalAmount);
 
         order.completePayment();
 
         Order savedOrder = orderService.save(order);
 
+        OrderPlacedEvent event = new OrderPlacedEvent(
+                savedOrder.getId(),
+                savedOrder.getUserId(),
+                savedOrder.getTotalAmountValue(),
+                savedOrder.getPaidAt(),
+                savedOrder.getOrderItems().stream()
+                        .map(item -> new OrderPlacedEvent.OrderItemSnapshot(
+                                item.getProductId(),
+                                item.getProductName(),
+                                item.getQuantity(),
+                                item.getUnitPriceValue()
+                        ))
+                        .toList()
+        );
+        eventPublisher.publishEvent(event);
+
         return OrderInfo.from(savedOrder);
     }
 
-    private void validateAndDecreaseStock(
-            List<OrderPlaceCommand.OrderItemCommand> items,
-            Map<Long, Product> productMap
-    ) {
-        for (OrderPlaceCommand.OrderItemCommand item : items) {
-            Product product = productMap.get(item.productId());
-
-            if (product == null) {
-                throw new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다.");
-            }
-
-            if (!product.isStockAvailable(item.quantity())) {
-                throw new CoreException(ErrorType.BAD_REQUEST,
-                        String.format("상품 '%s'의 재고가 부족합니다.", product.getName()));
-            }
-
-            product.decreaseStock(item.quantity());
-        }
-    }
-
     public List<OrderInfo> getMyOrders(String userId) {
-        User user = userService.getUserByUserId(userId);
-        List<Order> orders = orderService.getOrdersByUser(user);
+        List<Order> orders = orderService.getOrdersByUserId(userId);
 
         return orders.stream()
                 .map(OrderInfo::from)
@@ -89,8 +79,7 @@ public class OrderFacade {
     }
 
     public OrderInfo getOrderDetail(Long orderId, String userId) {
-        User user = userService.getUserByUserId(userId);
-        Order order = orderService.getOrderByIdAndUser(orderId, user);
+        Order order = orderService.getOrderByIdAndUserId(orderId, userId);
 
         return OrderInfo.from(order);
     }

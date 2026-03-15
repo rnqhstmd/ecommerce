@@ -30,7 +30,21 @@ public class ProductService {
         return products;
     }
 
+    public List<Product> getProductsByIdsWithLock(List<Long> ids) {
+        List<Product> products = productRepository.findAllByIdsWithLock(ids);
+        if (products.size() != ids.size()) {
+            throw new CoreException(ErrorType.NOT_FOUND, "일부 상품을 찾을 수 없습니다.");
+        }
+        return products;
+    }
+
     public Page<Product> getProducts(ProductSearchCondition condition) {
         return productRepository.findProducts(condition.pageable(), condition.brandId());
+    }
+
+    @Transactional
+    public Product createProduct(String name, Long price, Integer stock, Long brandId) {
+        Product product = Product.create(name, price, stock, brandId);
+        return productRepository.save(product);
     }
 }

@@ -24,8 +24,8 @@ public record OrderInfo(
     ) {
         public static OrderItemInfo from(OrderItem item) {
             return new OrderItemInfo(
-                    item.getProduct().getId(),
-                    item.getProduct().getName(),
+                    item.getProductId(),
+                    item.getProductName(),
                     item.getQuantity(),
                     item.getUnitPriceValue(),
                     item.calculateAmount().getValue()
@@ -36,7 +36,7 @@ public record OrderInfo(
     public static OrderInfo from(Order order) {
         return new OrderInfo(
                 order.getId(),
-                order.getUser().getUserIdValue(),
+                order.getUserId(),
                 order.getTotalAmountValue(),
                 order.getStatus(),
                 order.getPaidAt(),

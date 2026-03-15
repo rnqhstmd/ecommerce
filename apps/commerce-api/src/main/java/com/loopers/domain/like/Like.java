@@ -1,32 +1,31 @@
 package com.loopers.domain.like;
 
 import com.loopers.domain.BaseEntity;
-import com.loopers.domain.product.Product;
-import com.loopers.domain.user.User;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Getter
-@Table(name = "likes")
+@Table(name = "likes", uniqueConstraints = @UniqueConstraint(name = "uq_likes_user_product", columnNames = {"user_id", "product_id"}))
+@SQLRestriction("deleted_at IS NULL")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Like extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @Column(name = "user_id", nullable = false)
+    private String userId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false)
-    private Product product;
+    @Column(name = "product_id", nullable = false)
+    private Long productId;
 
-    private Like(User user, Product product) {
-        this.user = user;
-        this.product = product;
+    private Like(String userId, Long productId) {
+        this.userId = userId;
+        this.productId = productId;
     }
-    public static Like create(User user, Product product) {
-        return new Like(user, product);
+
+    public static Like create(String userId, Long productId) {
+        return new Like(userId, productId);
     }
 }

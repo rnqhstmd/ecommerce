@@ -12,6 +12,11 @@ public class BrandFacade {
 
     private final BrandService brandService;
 
+    @Transactional
+    public BrandInfo createBrand(String name) {
+        return BrandInfo.from(brandService.createBrand(name));
+    }
+
     public BrandInfo getBrand(Long id) {
         return BrandInfo.from(brandService.getBrand(id));
     }

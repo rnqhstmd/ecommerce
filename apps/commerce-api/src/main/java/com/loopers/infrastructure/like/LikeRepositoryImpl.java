@@ -2,8 +2,6 @@ package com.loopers.infrastructure.like;
 
 import com.loopers.domain.like.Like;
 import com.loopers.domain.like.LikeRepository;
-import com.loopers.domain.product.Product;
-import com.loopers.domain.user.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -30,27 +28,27 @@ public class LikeRepositoryImpl implements LikeRepository {
     }
 
     @Override
-    public Optional<Like> findByUserAndProduct(User user, Product product) {
-        return jpaRepository.findByUserAndProduct(user, product);
+    public Optional<Like> findByUserIdAndProductId(String userId, Long productId) {
+        return jpaRepository.findByUserIdAndProductId(userId, productId);
     }
 
     @Override
-    public boolean existsByUserAndProduct(User user, Product product) {
-        return jpaRepository.existsByUserAndProduct(user, product);
+    public boolean existsByUserIdAndProductId(String userId, Long productId) {
+        return jpaRepository.existsByUserIdAndProductId(userId, productId);
     }
 
     @Override
-    public Long countByProduct(Product product) {
-        return jpaRepository.countByProduct(product);
+    public Long countByProductId(Long productId) {
+        return jpaRepository.countByProductId(productId);
     }
 
     @Override
-    public Map<Long, Long> findLikeCounts(List<Product> products) {
-        if (products == null || products.isEmpty()) {
+    public Map<Long, Long> findLikeCountsByProductIds(List<Long> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
             return Collections.emptyMap();
         }
 
-        return jpaRepository.findLikeCountsByProducts(products).stream()
+        return jpaRepository.findLikeCountsByProductIds(productIds).stream()
                 .collect(Collectors.toMap(
                         map -> ((Number) map.get("productId")).longValue(),
                         map -> ((Number) map.get("likeCount")).longValue()

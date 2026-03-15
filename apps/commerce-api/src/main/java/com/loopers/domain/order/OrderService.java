@@ -1,6 +1,5 @@
 package com.loopers.domain.order;
 
-import com.loopers.domain.user.User;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +10,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class OrderService {
 
     private final OrderRepository orderRepository;
@@ -20,12 +20,12 @@ public class OrderService {
         return orderRepository.save(order);
     }
 
-    public List<Order> getOrdersByUser(User user) {
-        return orderRepository.findAllByUser(user);
+    public List<Order> getOrdersByUserId(String userId) {
+        return orderRepository.findAllByUserId(userId);
     }
 
-    public Order getOrderByIdAndUser(Long orderId, User user) {
-        return orderRepository.findByIdAndUser(orderId, user)
+    public Order getOrderByIdAndUserId(Long orderId, String userId) {
+        return orderRepository.findByIdAndUserId(orderId, userId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
     }
 }
