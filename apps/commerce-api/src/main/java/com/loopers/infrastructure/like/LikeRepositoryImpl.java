@@ -7,8 +7,8 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Repository
@@ -50,8 +50,8 @@ public class LikeRepositoryImpl implements LikeRepository {
 
         return jpaRepository.findLikeCountsByProductIds(productIds).stream()
                 .collect(Collectors.toMap(
-                        map -> ((Number) map.get("productId")).longValue(),
-                        map -> ((Number) map.get("likeCount")).longValue()
+                        LikeJpaRepository.LikeCountProjection::getProductId,
+                        LikeJpaRepository.LikeCountProjection::getLikeCount
                 ));
     }
 }

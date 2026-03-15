@@ -6,7 +6,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 public interface LikeJpaRepository extends JpaRepository<Like, Long> {
@@ -17,5 +16,10 @@ public interface LikeJpaRepository extends JpaRepository<Like, Long> {
 
     @Query("SELECT l.productId as productId, COUNT(l) as likeCount " +
             "FROM Like l WHERE l.productId IN :productIds GROUP BY l.productId")
-    List<Map<String, Object>> findLikeCountsByProductIds(@Param("productIds") List<Long> productIds);
+    List<LikeCountProjection> findLikeCountsByProductIds(@Param("productIds") List<Long> productIds);
+
+    interface LikeCountProjection {
+        Long getProductId();
+        Long getLikeCount();
+    }
 }

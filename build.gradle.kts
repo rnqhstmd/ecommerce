@@ -45,6 +45,16 @@ subprojects {
         }
     }
 
+    extra["testcontainers.version"] = "1.21.0"
+
+    configurations.all {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "com.github.docker-java") {
+                useVersion("3.5.1")
+            }
+        }
+    }
+
     dependencies {
         // Web
         runtimeOnly("org.springframework.boot:spring-boot-starter-validation")
@@ -83,6 +93,9 @@ subprojects {
         systemProperty("user.timezone", "Asia/Seoul")
         systemProperty("spring.profiles.active", "test")
         jvmArgs("-Xshare:off")
+        // Testcontainers Docker Desktop 29.x 호환: DOCKER_HOST를 raw socket으로 지정
+        // Docker Desktop 업데이트 또는 Testcontainers 호환 패치 후 제거 가능
+        environment("DOCKER_HOST", "unix:///Users/bonseung/Library/Containers/com.docker.docker/Data/docker.raw.sock")
     }
 
     tasks.withType<JacocoReport> {

@@ -19,10 +19,11 @@ public class PointFacade {
     }
 
     @Transactional
-    public void chargePoint(PointCommand command) {
-        pointService.chargePoint(
+    public PointInfo chargePoint(PointCommand command) {
+        Point point = pointService.chargePoint(
                 command.userId(),
                 command.amount()
         );
+        return new PointInfo(command.userId(), point.getBalanceValue());
     }
 }

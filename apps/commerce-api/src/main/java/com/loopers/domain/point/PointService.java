@@ -33,10 +33,10 @@ public class PointService {
     }
 
     @Transactional
-    public void chargePoint(String userId, Long amount) {
+    public Point chargePoint(String userId, Long amount) {
         Point point = getPointWithLock(userId);
         point.charge(amount);
-        pointRepository.save(point);
+        return pointRepository.save(point);
     }
 
     @Transactional

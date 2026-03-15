@@ -41,9 +41,7 @@ public class PointV1Controller implements PointV1ApiSpec {
         }
 
         PointCommand command = request.toCommand(userId);
-
-        pointFacade.chargePoint(command);
-        PointInfo pointInfo = pointFacade.getPoint(userId);
+        PointInfo pointInfo = pointFacade.chargePoint(command);
 
         return ApiResponse.success(PointV1Dto.PointResponse.of(pointInfo.userId(), pointInfo.balance()));
     }
