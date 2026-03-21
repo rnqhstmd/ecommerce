@@ -18,6 +18,8 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
@@ -132,5 +134,77 @@ class LikeV1ApiE2ETest {
 
         // assert
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @DisplayName("GET /api/v1/likes - X-USER-ID 없으면 401을 반환한다.")
+    @Test
+    void getMyLikes_returnsUnauthorized_whenNoUserId() {
+        // act
+        ResponseEntity<ApiResponse<Object>> response =
+                testRestTemplate.exchange(
+                        "/api/v1/likes",
+                        HttpMethod.GET,
+                        null,
+                        new ParameterizedTypeReference<>() {}
+                );
+
+        // assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @DisplayName("GET /api/v1/likes - 좋아요가 없으면 빈 목록을 반환한다.")
+    @Test
+    void getMyLikes_returnsEmptyList() {
+        // arrange
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-USER-ID", "likeuser01");
+
+        // act
+        ResponseEntity<ApiResponse<List<LikeV1Dto.LikeItemResponse>>> response =
+                testRestTemplate.exchange(
+                        "/api/v1/likes",
+                        HttpMethod.GET,
+                        new HttpEntity<>(headers),
+                        new ParameterizedTypeReference<>() {}
+                );
+
+        // assert
+        assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody()).isNotNull(),
+                () -> assertThat(response.getBody().data()).isEmpty()
+        );
+    }
+
+    @DisplayName("GET /api/v1/likes - 좋아요 후 목록에 포함된다.")
+    @Test
+    void getMyLikes_containsLikedProduct() {
+        // arrange - 좋아요 등록
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-USER-ID", "likeuser01");
+        LikeV1Dto.LikeRequest request = new LikeV1Dto.LikeRequest(productId);
+        testRestTemplate.exchange(
+                "/api/v1/likes",
+                HttpMethod.POST,
+                new HttpEntity<>(request, headers),
+                new ParameterizedTypeReference<ApiResponse<LikeV1Dto.LikeResponse>>() {}
+        );
+
+        // act
+        ResponseEntity<ApiResponse<List<LikeV1Dto.LikeItemResponse>>> response =
+                testRestTemplate.exchange(
+                        "/api/v1/likes",
+                        HttpMethod.GET,
+                        new HttpEntity<>(headers),
+                        new ParameterizedTypeReference<>() {}
+                );
+
+        // assert
+        assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody()).isNotNull(),
+                () -> assertThat(response.getBody().data()).hasSize(1),
+                () -> assertThat(response.getBody().data().get(0).productId()).isEqualTo(productId)
+        );
     }
 }
