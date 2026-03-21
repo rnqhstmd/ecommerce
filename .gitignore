@@ -38,6 +38,7 @@ out/
 
 ### Dev Skill ###
 .dev/
+.omc/
 
 ### Kotlin ###
 .kotlin

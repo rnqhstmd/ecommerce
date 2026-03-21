@@ -95,7 +95,10 @@ subprojects {
         jvmArgs("-Xshare:off")
         // Testcontainers Docker Desktop 29.x 호환: DOCKER_HOST를 raw socket으로 지정
         // Docker Desktop 업데이트 또는 Testcontainers 호환 패치 후 제거 가능
-        environment("DOCKER_HOST", "unix:///Users/bonseung/Library/Containers/com.docker.docker/Data/docker.raw.sock")
+        // 로컬 개발 시 gradle.properties에 dockerHost=unix:///path/to/docker.raw.sock 설정
+        if (project.hasProperty("dockerHost")) {
+            environment("DOCKER_HOST", project.property("dockerHost")!!)
+        }
     }
 
     tasks.withType<JacocoReport> {
