@@ -48,6 +48,9 @@ public class ProductV1Controller implements ProductV1ApiSpec {
     public ApiResponse<ProductV1Dto.ProductListResponse> getProducts(
             @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @RequestParam(required = false) Long brandId,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long minPrice,
+            @RequestParam(required = false) Long maxPrice,
             @RequestParam(defaultValue = "latest") String sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
@@ -55,10 +58,39 @@ public class ProductV1Controller implements ProductV1ApiSpec {
         if (page < 0 || size <= 0 || size > 100) {
             throw new CoreException(ErrorType.BAD_REQUEST, "page는 0 이상, size는 1~100 이어야 합니다.");
         }
+
+        // keyword 검증: trim 후 blank면 null, 100자 초과면 400
+        String normalizedKeyword = null;
+        if (keyword != null) {
+            normalizedKeyword = keyword.trim();
+            if (normalizedKeyword.isBlank()) {
+                normalizedKeyword = null;
+            } else if (normalizedKeyword.length() > 100) {
+                throw new CoreException(ErrorType.BAD_REQUEST, "keyword는 최대 100자입니다.");
+            }
+        }
+
+        // minPrice 검증
+        if (minPrice != null && minPrice < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "minPrice는 0 이상이어야 합니다.");
+        }
+
+        // maxPrice 검증
+        if (maxPrice != null && maxPrice < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "maxPrice는 0 이상이어야 합니다.");
+        }
+
+        // minPrice > maxPrice 검증
+        if (minPrice != null && maxPrice != null && minPrice > maxPrice) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "minPrice는 maxPrice보다 클 수 없습니다.");
+        }
+
         String normalizedUserId = (userId == null || userId.isBlank()) ? null : userId;
         Sort sortOrder = parseSort(sort);
         Pageable pageable = PageRequest.of(page, size, sortOrder);
-        ProductGetListCommand command = new ProductGetListCommand(brandId, normalizedUserId, pageable);
+        ProductGetListCommand command = new ProductGetListCommand(
+                brandId, normalizedUserId, normalizedKeyword, minPrice, maxPrice, pageable
+        );
         ProductListInfo info = productFacade.getProducts(command);
         return ApiResponse.success(ProductV1Dto.ProductListResponse.from(info));
     }

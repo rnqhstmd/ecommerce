@@ -126,12 +126,12 @@ class OrderV1ApiE2ETest {
     @Test
     void getMyOrders_returnsUnauthorized_whenNoUserId() {
         // act
-        ResponseEntity<ApiResponse<Object>> response =
+        ResponseEntity<String> response =
                 testRestTemplate.exchange(
                         "/api/v1/orders",
                         HttpMethod.GET,
                         null,
-                        new ParameterizedTypeReference<>() {}
+                        String.class
                 );
 
         // assert
@@ -146,19 +146,20 @@ class OrderV1ApiE2ETest {
         headers.set("X-USER-ID", "orderuser");
 
         // act
-        ResponseEntity<ApiResponse<List<OrderV1Dto.OrderResponse>>> response =
+        ResponseEntity<String> response =
                 testRestTemplate.exchange(
                         "/api/v1/orders",
                         HttpMethod.GET,
                         new HttpEntity<>(headers),
-                        new ParameterizedTypeReference<>() {}
+                        String.class
                 );
 
         // assert
         assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(response.getBody()).isNotNull(),
-                () -> assertThat(response.getBody().data()).isEmpty()
+                () -> assertThat(response.getBody()).contains("\"content\":[]"),
+                () -> assertThat(response.getBody()).contains("\"totalElements\":0")
         );
     }
 
@@ -179,20 +180,20 @@ class OrderV1ApiE2ETest {
         );
 
         // act
-        ResponseEntity<ApiResponse<List<OrderV1Dto.OrderResponse>>> response =
+        ResponseEntity<String> response =
                 testRestTemplate.exchange(
                         "/api/v1/orders",
                         HttpMethod.GET,
                         new HttpEntity<>(headers),
-                        new ParameterizedTypeReference<>() {}
+                        String.class
                 );
 
         // assert
         assertAll(
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(response.getBody()).isNotNull(),
-                () -> assertThat(response.getBody().data()).hasSize(1),
-                () -> assertThat(response.getBody().data().get(0).userId()).isEqualTo("orderuser")
+                () -> assertThat(response.getBody()).contains("\"totalElements\":1"),
+                () -> assertThat(response.getBody()).contains("\"PAID\"")
         );
     }
 

@@ -71,6 +71,12 @@ public interface ProductV1ApiSpec {
             @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @Parameter(description = "브랜드 ID 필터 (선택)")
             @RequestParam(required = false) Long brandId,
+            @Parameter(description = "상품명 키워드 검색 (선택, 최대 100자)")
+            @RequestParam(required = false) String keyword,
+            @Parameter(description = "최소 가격 필터 (선택, >= 0)")
+            @RequestParam(required = false) Long minPrice,
+            @Parameter(description = "최대 가격 필터 (선택, >= minPrice)")
+            @RequestParam(required = false) Long maxPrice,
             @Parameter(description = "정렬 기준 (latest, price_asc, likes_desc)")
             @RequestParam(defaultValue = "latest") String sort,
             @Parameter(description = "페이지 번호 (0부터 시작)")

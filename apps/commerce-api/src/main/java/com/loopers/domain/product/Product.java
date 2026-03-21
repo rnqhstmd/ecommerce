@@ -61,6 +61,10 @@ public class Product extends BaseEntity {
         this.stock = this.stock.decrease(quantity);
     }
 
+    public void increaseStock(Integer quantity) {
+        this.stock = this.stock.increase(quantity);
+    }
+
     public boolean isStockAvailable(Integer quantity) {
         return this.stock.isAvailable(quantity);
     }

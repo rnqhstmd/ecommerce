@@ -45,6 +45,10 @@ public class Point extends BaseEntity {
         this.balance = this.balance.use(amount);
     }
 
+    public void refund(Long amount) {
+        this.balance = this.balance.charge(amount);
+    }
+
     public Long getBalanceValue() {
         return this.balance.getValue();
     }

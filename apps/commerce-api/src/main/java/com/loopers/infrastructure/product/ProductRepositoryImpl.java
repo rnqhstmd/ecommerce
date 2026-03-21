@@ -2,9 +2,9 @@ package com.loopers.infrastructure.product;
 
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductSearchCondition;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
@@ -16,6 +16,7 @@ import java.util.Optional;
 public class ProductRepositoryImpl implements ProductRepository {
 
     private final ProductJpaRepository jpaRepository;
+    private final ProductQueryRepository queryRepository;
 
     @Override
     public Product save(Product product) {
@@ -38,8 +39,13 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public Page<Product> findProducts(Pageable pageable, Long brandId) {
-        return jpaRepository.findProducts(brandId, pageable);
+    public Optional<Product> findByIdWithLock(Long id) {
+        return jpaRepository.findByIdWithLock(id);
+    }
+
+    @Override
+    public Page<Product> findProducts(ProductSearchCondition condition) {
+        return queryRepository.findProducts(condition);
     }
 
     @Override

@@ -25,6 +25,12 @@ public class ProductService {
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다."));
     }
 
+    @Transactional
+    public Product getProductWithLock(Long id) {
+        return productRepository.findByIdWithLock(id)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다."));
+    }
+
     public List<Product> getProductsByIds(Collection<Long> ids) {
         List<Product> products = productRepository.findAllByIds(ids);
         if (products.size() != ids.size()) {
@@ -42,7 +48,7 @@ public class ProductService {
     }
 
     public Page<Product> getProducts(ProductSearchCondition condition) {
-        return productRepository.findProducts(condition.pageable(), condition.brandId());
+        return productRepository.findProducts(condition);
     }
 
     @Transactional

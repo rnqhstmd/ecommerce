@@ -1,8 +1,11 @@
 package com.loopers.application.point;
 
 import com.loopers.domain.point.Point;
+import com.loopers.domain.point.PointHistory;
 import com.loopers.domain.point.PointService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,5 +28,11 @@ public class PointFacade {
                 command.amount()
         );
         return new PointInfo(command.userId(), point.getBalanceValue());
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PointHistory> getPointHistory(String userId, Pageable pageable) {
+        Point point = pointService.getPoint(userId);
+        return pointService.getPointHistory(point.getId(), pageable);
     }
 }
