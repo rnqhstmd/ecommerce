@@ -26,10 +26,16 @@ public class ProductFacade {
         return ProductDetailInfo.of(product, 0L);
     }
 
-    public ProductDetailInfo getProductDetail(Long productId) {
+    public ProductDetailInfo getProductDetail(Long productId, String userId) {
         Product product = productService.getProduct(productId);
         Long likeCount = likeService.getLikeCount(product.getId());
-        return ProductDetailInfo.of(product, likeCount);
+        Boolean isLiked = likeService.getIsLiked(userId, product.getId());
+        return ProductDetailInfo.of(product, likeCount, isLiked);
+    }
+
+    // 하위 호환 오버로드
+    public ProductDetailInfo getProductDetail(Long productId) {
+        return getProductDetail(productId, null);
     }
 
     public ProductListInfo getProducts(ProductGetListCommand command) {
@@ -43,6 +49,7 @@ public class ProductFacade {
                 .map(Product::getId)
                 .toList();
         Map<Long, Long> likeCountMap = likeService.getLikeCountsByProductIds(productIds);
-        return ProductListInfo.of(productPage, likeCountMap);
+        Map<Long, Boolean> isLikedMap = likeService.getIsLikedMap(command.userId(), productIds);
+        return ProductListInfo.of(productPage, likeCountMap, isLikedMap);
     }
 }

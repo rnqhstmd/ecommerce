@@ -143,4 +143,133 @@ class LikeServiceIntegrationTest {
             assertThat(count2).isEqualTo(1L);
         }
     }
+
+    @DisplayName("사용자별 좋아요 목록 조회")
+    @Nested
+    class GetLikesByUserId {
+
+        @DisplayName("사용자의 좋아요 목록을 조회할 수 있다.")
+        @Test
+        void getLikesByUserId() {
+            // arrange
+            likeService.addLike(userId1, productId1);
+            likeService.addLike(userId1, productId2);
+
+            // act
+            java.util.List<Like> likes = likeService.getLikesByUserId(userId1);
+
+            // assert
+            assertThat(likes).hasSize(2);
+            assertThat(likes).extracting(Like::getProductId)
+                    .containsExactlyInAnyOrder(productId1, productId2);
+        }
+    }
+
+    @DisplayName("좋아요 여부 단건 조회")
+    @Nested
+    class GetIsLiked {
+
+        @DisplayName("좋아요한 상품은 true를 반환한다.")
+        @Test
+        void getIsLiked_returnsTrue() {
+            // arrange
+            likeService.addLike(userId1, productId1);
+
+            // act
+            Boolean result = likeService.getIsLiked(userId1, productId1);
+
+            // assert
+            assertThat(result).isTrue();
+        }
+
+        @DisplayName("좋아요하지 않은 상품은 false를 반환한다.")
+        @Test
+        void getIsLiked_returnsFalse() {
+            // act
+            Boolean result = likeService.getIsLiked(userId1, productId1);
+
+            // assert
+            assertThat(result).isFalse();
+        }
+
+        @DisplayName("userId가 null이면 null을 반환한다.")
+        @Test
+        void getIsLiked_returnsNull_whenUserIdIsNull() {
+            // act
+            Boolean result = likeService.getIsLiked(null, productId1);
+
+            // assert
+            assertThat(result).isNull();
+        }
+    }
+
+    @DisplayName("좋아요 여부 일괄 조회")
+    @Nested
+    class GetIsLikedMap {
+
+        @DisplayName("여러 상품의 좋아요 여부를 일괄 조회할 수 있다.")
+        @Test
+        void getIsLikedMap() {
+            // arrange
+            likeService.addLike(userId1, productId1);
+
+            // act
+            java.util.Map<Long, Boolean> result = likeService.getIsLikedMap(
+                    userId1, java.util.List.of(productId1, productId2)
+            );
+
+            // assert
+            assertThat(result).hasSize(2);
+            assertThat(result.get(productId1)).isTrue();
+            assertThat(result.get(productId2)).isFalse();
+        }
+
+        @DisplayName("userId가 null이면 빈 맵을 반환한다.")
+        @Test
+        void getIsLikedMap_returnsEmptyMap_whenUserIdIsNull() {
+            // act
+            java.util.Map<Long, Boolean> result = likeService.getIsLikedMap(
+                    null, java.util.List.of(productId1)
+            );
+
+            // assert
+            assertThat(result).isEmpty();
+        }
+    }
+
+    @DisplayName("좋아요 등록 시 likeCount 증가/감소")
+    @Nested
+    class LikeCountSync {
+
+        @DisplayName("좋아요 등록 시 상품의 likeCount가 증가한다.")
+        @Test
+        void addLike_increasesLikeCount() {
+            // arrange
+            Product product = productRepository.findById(productId1).orElseThrow();
+            Long beforeCount = product.getLikeCount();
+
+            // act
+            likeService.addLike(userId1, productId1);
+
+            // assert
+            Product updatedProduct = productRepository.findById(productId1).orElseThrow();
+            assertThat(updatedProduct.getLikeCount()).isEqualTo(beforeCount + 1);
+        }
+
+        @DisplayName("좋아요 취소 시 상품의 likeCount가 감소한다.")
+        @Test
+        void removeLike_decreasesLikeCount() {
+            // arrange
+            likeService.addLike(userId1, productId1);
+            Product product = productRepository.findById(productId1).orElseThrow();
+            Long afterAddCount = product.getLikeCount();
+
+            // act
+            likeService.removeLike(userId1, productId1);
+
+            // assert
+            Product updatedProduct = productRepository.findById(productId1).orElseThrow();
+            assertThat(updatedProduct.getLikeCount()).isEqualTo(afterAddCount - 1);
+        }
+    }
 }

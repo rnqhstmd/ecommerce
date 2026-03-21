@@ -54,4 +54,17 @@ public class LikeRepositoryImpl implements LikeRepository {
                         LikeJpaRepository.LikeCountProjection::getLikeCount
                 ));
     }
+
+    @Override
+    public List<Like> findByUserId(String userId) {
+        return jpaRepository.findByUserId(userId);
+    }
+
+    @Override
+    public List<Long> findProductIdsByUserIdAndProductIds(String userId, List<Long> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return jpaRepository.findProductIdsByUserIdAndProductIds(userId, productIds);
+    }
 }

@@ -17,4 +17,10 @@ public class LikeV1Dto {
             return new LikeResponse(userId, productId);
         }
     }
+
+    public record LikeItemResponse(Long productId) {
+        public static LikeItemResponse of(Long productId) {
+            return new LikeItemResponse(productId);
+        }
+    }
 }

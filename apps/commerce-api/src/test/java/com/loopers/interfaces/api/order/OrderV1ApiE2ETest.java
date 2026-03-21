@@ -121,4 +121,152 @@ class OrderV1ApiE2ETest {
         // assert
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
+
+    @DisplayName("GET /api/v1/orders - X-USER-ID 없으면 401을 반환한다.")
+    @Test
+    void getMyOrders_returnsUnauthorized_whenNoUserId() {
+        // act
+        ResponseEntity<ApiResponse<Object>> response =
+                testRestTemplate.exchange(
+                        "/api/v1/orders",
+                        HttpMethod.GET,
+                        null,
+                        new ParameterizedTypeReference<>() {}
+                );
+
+        // assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @DisplayName("GET /api/v1/orders - 주문이 없으면 빈 목록을 반환한다.")
+    @Test
+    void getMyOrders_returnsEmptyList() {
+        // arrange
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-USER-ID", "orderuser");
+
+        // act
+        ResponseEntity<ApiResponse<List<OrderV1Dto.OrderResponse>>> response =
+                testRestTemplate.exchange(
+                        "/api/v1/orders",
+                        HttpMethod.GET,
+                        new HttpEntity<>(headers),
+                        new ParameterizedTypeReference<>() {}
+                );
+
+        // assert
+        assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody()).isNotNull(),
+                () -> assertThat(response.getBody().data()).isEmpty()
+        );
+    }
+
+    @DisplayName("GET /api/v1/orders - 주문 후 목록에 포함된다.")
+    @Test
+    void getMyOrders_returnsOrderList() {
+        // arrange - 주문 생성
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-USER-ID", "orderuser");
+        OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
+                List.of(new OrderV1Dto.OrderItemRequest(productId, 1))
+        );
+        testRestTemplate.exchange(
+                "/api/v1/orders",
+                HttpMethod.POST,
+                new HttpEntity<>(request, headers),
+                new ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>>() {}
+        );
+
+        // act
+        ResponseEntity<ApiResponse<List<OrderV1Dto.OrderResponse>>> response =
+                testRestTemplate.exchange(
+                        "/api/v1/orders",
+                        HttpMethod.GET,
+                        new HttpEntity<>(headers),
+                        new ParameterizedTypeReference<>() {}
+                );
+
+        // assert
+        assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody()).isNotNull(),
+                () -> assertThat(response.getBody().data()).hasSize(1),
+                () -> assertThat(response.getBody().data().get(0).userId()).isEqualTo("orderuser")
+        );
+    }
+
+    @DisplayName("GET /api/v1/orders/{id} - X-USER-ID 없으면 401을 반환한다.")
+    @Test
+    void getOrderDetail_returnsUnauthorized_whenNoUserId() {
+        // act
+        ResponseEntity<ApiResponse<Object>> response =
+                testRestTemplate.exchange(
+                        "/api/v1/orders/1",
+                        HttpMethod.GET,
+                        null,
+                        new ParameterizedTypeReference<>() {}
+                );
+
+        // assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @DisplayName("GET /api/v1/orders/{id} - 존재하지 않는 주문 조회 시 404를 반환한다.")
+    @Test
+    void getOrderDetail_returnsNotFound_whenOrderNotExists() {
+        // arrange
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-USER-ID", "orderuser");
+
+        // act
+        ResponseEntity<ApiResponse<Object>> response =
+                testRestTemplate.exchange(
+                        "/api/v1/orders/99999",
+                        HttpMethod.GET,
+                        new HttpEntity<>(headers),
+                        new ParameterizedTypeReference<>() {}
+                );
+
+        // assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @DisplayName("GET /api/v1/orders/{id} - 주문 상세 조회에 성공한다.")
+    @Test
+    void getOrderDetail_success() {
+        // arrange - 주문 생성
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-USER-ID", "orderuser");
+        OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
+                List.of(new OrderV1Dto.OrderItemRequest(productId, 2))
+        );
+        ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> createResponse =
+                testRestTemplate.exchange(
+                        "/api/v1/orders",
+                        HttpMethod.POST,
+                        new HttpEntity<>(request, headers),
+                        new ParameterizedTypeReference<>() {}
+                );
+        Long orderId = createResponse.getBody().data().orderId();
+
+        // act
+        ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response =
+                testRestTemplate.exchange(
+                        "/api/v1/orders/" + orderId,
+                        HttpMethod.GET,
+                        new HttpEntity<>(headers),
+                        new ParameterizedTypeReference<>() {}
+                );
+
+        // assert
+        assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody()).isNotNull(),
+                () -> assertThat(response.getBody().data().orderId()).isEqualTo(orderId),
+                () -> assertThat(response.getBody().data().userId()).isEqualTo("orderuser"),
+                () -> assertThat(response.getBody().data().totalAmount()).isEqualTo(2000L),
+                () -> assertThat(response.getBody().data().items()).hasSize(1)
+        );
+    }
 }

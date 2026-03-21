@@ -47,6 +47,11 @@ public class StockDeductionService {
             product.decreaseStock(command.quantity());
         }
 
+        // 변경된 상품에 대한 캐시 무효화
+        for (Long productId : sortedProductIds) {
+            productService.evictProductCache(productId);
+        }
+
         return products;
     }
 

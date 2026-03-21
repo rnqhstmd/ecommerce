@@ -8,16 +8,23 @@ public record ProductDetailInfo(
         Long price,
         Integer stock,
         Long brandId,
-        Long likeCount
+        Long likeCount,
+        Boolean isLiked
 ) {
-    public static ProductDetailInfo of(Product product, Long likeCount) {
+    public static ProductDetailInfo of(Product product, Long likeCount, Boolean isLiked) {
         return new ProductDetailInfo(
                 product.getId(),
                 product.getName(),
                 product.getPriceValue(),
                 product.getStockValue(),
                 product.getBrandId(),
-                likeCount
+                likeCount,
+                isLiked
         );
+    }
+
+    // 하위 호환용 오버로드 (createProduct 호출부 보호)
+    public static ProductDetailInfo of(Product product, Long likeCount) {
+        return of(product, likeCount, null);
     }
 }
