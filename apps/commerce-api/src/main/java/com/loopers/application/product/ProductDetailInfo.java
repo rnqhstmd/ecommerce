@@ -8,7 +8,6 @@ public record ProductDetailInfo(
         Long price,
         Integer stock,
         Long brandId,
-        String brandName,
         Long likeCount
 ) {
     public static ProductDetailInfo of(Product product, Long likeCount) {
@@ -17,8 +16,7 @@ public record ProductDetailInfo(
                 product.getName(),
                 product.getPriceValue(),
                 product.getStockValue(),
-                product.getBrand().getId(),
-                product.getBrand().getName(),
+                product.getBrandId(),
                 likeCount
         );
     }

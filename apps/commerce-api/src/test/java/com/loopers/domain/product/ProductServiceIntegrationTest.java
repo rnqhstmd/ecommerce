@@ -50,11 +50,11 @@ class ProductServiceIntegrationTest {
         savedBrand2 = brandRepository.save(Brand.create("Brand B"));
 
         // Brand A 소속 상품 2개
-        savedProduct1 = productRepository.save(Product.create("Product 1 (A)", 1000L, 10, savedBrand1));
-        savedProduct2 = productRepository.save(Product.create("Product 2 (A)", 2000L, 20, savedBrand1));
+        savedProduct1 = productRepository.save(Product.create("Product 1 (A)", 1000L, 10, savedBrand1.getId()));
+        savedProduct2 = productRepository.save(Product.create("Product 2 (A)", 2000L, 20, savedBrand1.getId()));
 
         // Brand B 소속 상품 1개
-        savedProduct3 = productRepository.save(Product.create("Product 3 (B)", 3000L, 30, savedBrand2));
+        savedProduct3 = productRepository.save(Product.create("Product 3 (B)", 3000L, 30, savedBrand2.getId()));
     }
 
     @AfterEach

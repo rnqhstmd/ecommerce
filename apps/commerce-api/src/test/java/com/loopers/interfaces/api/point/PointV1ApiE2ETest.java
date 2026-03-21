@@ -131,9 +131,9 @@ class PointV1ApiE2ETest {
 			);
 		}
 
-		@DisplayName("X-USER-ID 헤더가 없을 경우, 400 Bad Request 응답을 반환한다.")
+		@DisplayName("X-USER-ID 헤더가 없을 경우, 401 Unauthorized 응답을 반환한다.")
 		@Test
-		void returnsBadRequest_whenUserIdHeaderIsMissing() {
+		void returnsUnauthorized_whenUserIdHeaderIsMissing() {
 			// act - 헤더 없이 요청
 			ParameterizedTypeReference<ApiResponse<PointV1Dto.PointResponse>> responseType =
 					new ParameterizedTypeReference<>() {};
@@ -148,13 +148,13 @@ class PointV1ApiE2ETest {
 			// assert
 			assertAll(
 					() -> assertTrue(response.getStatusCode().is4xxClientError()),
-					() -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST)
+					() -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED)
 			);
 		}
 
-		@DisplayName("X-USER-ID 헤더가 빈 문자열일 경우, 400 Bad Request 응답을 반환한다.")
+		@DisplayName("X-USER-ID 헤더가 빈 문자열일 경우, 401 Unauthorized 응답을 반환한다.")
 		@Test
-		void returnsBadRequest_whenUserIdHeaderIsEmpty() {
+		void returnsUnauthorized_whenUserIdHeaderIsEmpty() {
 			// arrange
 			HttpHeaders headers = new HttpHeaders();
 			headers.set("X-USER-ID", "");
@@ -173,13 +173,13 @@ class PointV1ApiE2ETest {
 			// assert
 			assertAll(
 					() -> assertTrue(response.getStatusCode().is4xxClientError()),
-					() -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST)
+					() -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED)
 			);
 		}
 
-		@DisplayName("X-USER-ID 헤더가 공백 문자열일 경우, 400 Bad Request 응답을 반환한다.")
+		@DisplayName("X-USER-ID 헤더가 공백 문자열일 경우, 401 Unauthorized 응답을 반환한다.")
 		@Test
-		void returnsBadRequest_whenUserIdHeaderIsBlank() {
+		void returnsUnauthorized_whenUserIdHeaderIsBlank() {
 			// arrange
 			HttpHeaders headers = new HttpHeaders();
 			headers.set("X-USER-ID", "   ");
@@ -198,7 +198,7 @@ class PointV1ApiE2ETest {
 			// assert
 			assertAll(
 					() -> assertTrue(response.getStatusCode().is4xxClientError()),
-					() -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST)
+					() -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED)
 			);
 		}
 
@@ -347,9 +347,9 @@ class PointV1ApiE2ETest {
 			);
 		}
 
-		@DisplayName("X-USER-ID 헤더가 없을 경우, 400 Bad Request 응답을 반환한다.")
+		@DisplayName("X-USER-ID 헤더가 없을 경우, 401 Unauthorized 응답을 반환한다.")
 		@Test
-		void returnsBadRequest_whenUserIdHeaderIsMissing() {
+		void returnsUnauthorized_whenUserIdHeaderIsMissing() {
 			// arrange
 			PointV1Dto.ChargeRequest chargeRequest = new PointV1Dto.ChargeRequest(1000L);
 
@@ -367,7 +367,7 @@ class PointV1ApiE2ETest {
 			// assert
 			assertAll(
 					() -> assertTrue(response.getStatusCode().is4xxClientError()),
-					() -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST)
+					() -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED)
 			);
 		}
 

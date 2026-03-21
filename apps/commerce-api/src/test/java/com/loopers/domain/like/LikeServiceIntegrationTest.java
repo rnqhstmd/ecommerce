@@ -37,19 +37,23 @@ class LikeServiceIntegrationTest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
-    private User user1, user2;
-    private Product product1, product2;
+    private String userId1, userId2;
+    private Long productId1, productId2;
 
     @BeforeEach
     void setUp() {
         // 테스트용 사용자 생성
-        user1 = userService.signUp("likeUser01", "like@mail.com", "1990-01-01", Gender.MALE);
-        user2 = userService.signUp("likeUser02", "like@mail.com", "1990-01-02", Gender.FEMALE);
+        User user1 = userService.signUp("likeUser01", "like@mail.com", "1990-01-01", Gender.MALE);
+        User user2 = userService.signUp("likeUser02", "like@mail.com", "1990-01-02", Gender.FEMALE);
+        userId1 = user1.getUserIdValue();
+        userId2 = user2.getUserIdValue();
 
         // 테스트용 상품 생성
         Brand brand = brandRepository.save(Brand.create("Like Brand"));
-        product1 = productRepository.save(Product.create("Like Product 1", 1000L, 10, brand));
-        product2 = productRepository.save(Product.create("Like Product 2", 2000L, 20, brand));
+        Product product1 = productRepository.save(Product.create("Like Product 1", 1000L, 10, brand.getId()));
+        Product product2 = productRepository.save(Product.create("Like Product 2", 2000L, 20, brand.getId()));
+        productId1 = product1.getId();
+        productId2 = product2.getId();
     }
 
     @AfterEach
@@ -65,52 +69,50 @@ class LikeServiceIntegrationTest {
         @Test
         void addLike() {
             // act
-            likeService.addLike(user1, product1);
+            likeService.addLike(userId1, productId1);
 
             // assert
             verify(likeRepository, times(1)).save(any(Like.class));
-            assertThat(likeRepository.existsByUserAndProduct(user1, product1)).isTrue();
+            assertThat(likeRepository.existsByUserIdAndProductId(userId1, productId1)).isTrue();
         }
 
         @DisplayName("중복 좋아요 방지를 위한 멱등성 처리가 구현되었다.")
         @Test
         void addLike_idempotent() {
             // arrange
-            likeService.addLike(user1, product1); // 1번째 호출
+            likeService.addLike(userId1, productId1); // 1번째 호출
 
             // act
-            likeService.addLike(user1, product1); // 2번째 (중복) 호출
+            likeService.addLike(userId1, productId1); // 2번째 (중복) 호출
 
             // assert
-            // 1. Service 로직(existsByUserAndProduct)에 의해 save는 총 1번만 호출되어야 함
             verify(likeRepository, times(1)).save(any(Like.class));
-            // 2. existsByUserAndProduct는 총 2번 호출됨 (첫번째 시도 + 두번째 중복 체크)
-            verify(likeRepository, times(2)).existsByUserAndProduct(user1, product1);
+            verify(likeRepository, times(2)).existsByUserIdAndProductId(userId1, productId1);
         }
 
         @DisplayName("좋아요를 취소할 수 있다.")
         @Test
         void removeLike() {
             // arrange (미리 좋아요 추가)
-            likeService.addLike(user1, product1);
-            assertThat(likeRepository.existsByUserAndProduct(user1, product1)).isTrue();
+            likeService.addLike(userId1, productId1);
+            assertThat(likeRepository.existsByUserIdAndProductId(userId1, productId1)).isTrue();
 
             // act
-            likeService.removeLike(user1, product1);
+            likeService.removeLike(userId1, productId1);
 
             // assert
             verify(likeRepository, times(1)).delete(any(Like.class));
-            assertThat(likeRepository.existsByUserAndProduct(user1, product1)).isFalse();
+            assertThat(likeRepository.existsByUserIdAndProductId(userId1, productId1)).isFalse();
         }
 
         @DisplayName("좋아요를 누르지 않은 상품을 취소해도 에러가 발생하지 않는다.")
         @Test
         void removeLike_nonExistent() {
             // arrange
-            assertThat(likeRepository.existsByUserAndProduct(user1, product1)).isFalse();
+            assertThat(likeRepository.existsByUserIdAndProductId(userId1, productId1)).isFalse();
 
             // act
-            likeService.removeLike(user1, product1);
+            likeService.removeLike(userId1, productId1);
 
             // assert
             verify(likeRepository, never()).delete(any(Like.class));
@@ -126,17 +128,17 @@ class LikeServiceIntegrationTest {
         @Test
         void getLikeCount() {
             // arrange
-            likeService.addLike(user1, product1); // product1 (1)
-            likeService.addLike(user2, product1); // product1 (2)
-            likeService.addLike(user1, product2); // product2 (1)
+            likeService.addLike(userId1, productId1); // product1 (1)
+            likeService.addLike(userId2, productId1); // product1 (2)
+            likeService.addLike(userId1, productId2); // product2 (1)
 
             // act
-            Long count1 = likeService.getLikeCount(product1);
-            Long count2 = likeService.getLikeCount(product2);
+            Long count1 = likeService.getLikeCount(productId1);
+            Long count2 = likeService.getLikeCount(productId2);
 
             // assert
-            verify(likeRepository, times(1)).countByProduct(product1);
-            verify(likeRepository, times(1)).countByProduct(product2);
+            verify(likeRepository, times(1)).countByProductId(productId1);
+            verify(likeRepository, times(1)).countByProductId(productId2);
             assertThat(count1).isEqualTo(2L);
             assertThat(count2).isEqualTo(1L);
         }

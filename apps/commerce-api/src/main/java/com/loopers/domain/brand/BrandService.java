@@ -17,4 +17,10 @@ public class BrandService {
         return brandRepository.findById(id)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "브랜드를 찾을 수 없습니다."));
     }
+
+    @Transactional
+    public Brand createBrand(String name) {
+        Brand brand = Brand.create(name);
+        return brandRepository.save(brand);
+    }
 }

@@ -12,21 +12,18 @@ public class PointFacade {
 
     private final PointService pointService;
 
-    @Transactional
-    public void createPointForUser(String userId) {
-        pointService.createPoint(userId);
-    }
-
     @Transactional(readOnly = true)
-    public Point getPoint(String userId) {
-        return pointService.getPoint(userId);
+    public PointInfo getPoint(String userId) {
+        Point point = pointService.getPoint(userId);
+        return new PointInfo(userId, point.getBalanceValue());
     }
 
     @Transactional
-    public void chargePoint(PointCommand command) {
-        pointService.chargePoint(
+    public PointInfo chargePoint(PointCommand command) {
+        Point point = pointService.chargePoint(
                 command.userId(),
                 command.amount()
         );
+        return new PointInfo(command.userId(), point.getBalanceValue());
     }
 }

@@ -3,15 +3,17 @@ package com.loopers.domain.user;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-@Component
+@Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class UserService {
 
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public User signUp(String userId, String email, String birthDate, Gender gender) {
@@ -20,7 +22,11 @@ public class UserService {
         }
 
         User user = User.create(userId, email, birthDate, gender);
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        eventPublisher.publishEvent(new UserSignedUpEvent(savedUser.getUserIdValue()));
+
+        return savedUser;
     }
 
     public User getUserByUserId(String userId) {
