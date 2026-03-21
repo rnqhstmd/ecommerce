@@ -54,6 +54,11 @@ public interface OrderV1ApiSpec {
                     content = @Content(schema = @Schema(implementation = ApiResponse.class))
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401",
+                    description = "인증 필요",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "404",
                     description = "주문을 찾을 수 없음",
                     content = @Content(schema = @Schema(implementation = ApiResponse.class))
@@ -72,6 +77,11 @@ public interface OrderV1ApiSpec {
                     responseCode = "200",
                     description = "조회 성공",
                     content = @Content(schema = @Schema(implementation = PageResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "잘못된 요청 (status/size/page 검증 실패)",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401",

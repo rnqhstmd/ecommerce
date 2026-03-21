@@ -61,10 +61,10 @@ public class PointV1Controller implements PointV1ApiSpec {
             @RequestParam(defaultValue = "20") int size
     ) {
         if (userId == null || userId.isBlank()) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "X-USER-ID 헤더는 필수입니다.");
+            throw new CoreException(ErrorType.UNAUTHORIZED, "X-USER-ID 헤더는 필수입니다.");
         }
-        if (size < 1 || size > 100) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "size는 1 이상 100 이하여야 합니다.");
+        if (page < 0 || size < 1 || size > 100) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "page는 0 이상, size는 1 이상 100 이하여야 합니다.");
         }
 
         Pageable pageable = PageRequest.of(page, size);

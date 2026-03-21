@@ -106,8 +106,21 @@ public class OrderFacade {
                 .sorted(Comparator.comparing(OrderItem::getProductId))
                 .toList();
 
+        List<Long> productIds = sortedItems.stream()
+                .map(OrderItem::getProductId)
+                .distinct()
+                .sorted()
+                .toList();
+
+        List<Product> products = productService.getProductsByIdsWithLock(productIds);
+        Map<Long, Product> productMap = products.stream()
+                .collect(Collectors.toMap(Product::getId, Function.identity()));
+
         for (OrderItem item : sortedItems) {
-            Product product = productService.getProductWithLock(item.getProductId());
+            Product product = productMap.get(item.getProductId());
+            if (product == null) {
+                throw new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다. productId=" + item.getProductId());
+            }
             product.increaseStock(item.getQuantity());
         }
     }

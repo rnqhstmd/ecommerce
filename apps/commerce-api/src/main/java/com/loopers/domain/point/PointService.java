@@ -37,33 +37,26 @@ public class PointService {
 
     @Transactional
     public Point chargePoint(String userId, Long amount) {
-        Point point = getPointWithLock(userId);
-        point.charge(amount);
-        pointRepository.save(point);
-        pointHistoryRepository.save(
-                PointHistory.create(point, PointHistoryType.CHARGE, amount, point.getBalanceValue())
-        );
-        return point;
+        return updatePointAndLog(userId, amount, PointHistoryType.CHARGE, Point::charge);
     }
 
     @Transactional
     public Point usePoint(String userId, Long amount) {
-        Point point = getPointWithLock(userId);
-        point.use(amount);
-        pointRepository.save(point);
-        pointHistoryRepository.save(
-                PointHistory.create(point, PointHistoryType.USE, amount, point.getBalanceValue())
-        );
-        return point;
+        return updatePointAndLog(userId, amount, PointHistoryType.USE, Point::use);
     }
 
     @Transactional
     public Point refundPoint(String userId, Long amount) {
+        return updatePointAndLog(userId, amount, PointHistoryType.REFUND, Point::refund);
+    }
+
+    private Point updatePointAndLog(String userId, Long amount, PointHistoryType type,
+                                     java.util.function.BiConsumer<Point, Long> operation) {
         Point point = getPointWithLock(userId);
-        point.refund(amount);
+        operation.accept(point, amount);
         pointRepository.save(point);
         pointHistoryRepository.save(
-                PointHistory.create(point, PointHistoryType.REFUND, amount, point.getBalanceValue())
+                PointHistory.create(point, type, amount, point.getBalanceValue())
         );
         return point;
     }

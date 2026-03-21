@@ -53,8 +53,8 @@ public class OrderV1Controller implements OrderV1ApiSpec {
             @RequestParam(defaultValue = "20") int size
     ) {
         validateUserId(userId);
-        if (size < 1 || size > 100) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "size는 1 이상 100 이하여야 합니다.");
+        if (page < 0 || size < 1 || size > 100) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "page는 0 이상, size는 1 이상 100 이하여야 합니다.");
         }
 
         OrderStatus orderStatus = parseOrderStatus(status);

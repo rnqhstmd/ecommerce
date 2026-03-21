@@ -36,6 +36,7 @@ public class Order extends BaseEntity {
     @Column(name = "cancelled_at")
     private ZonedDateTime cancelledAt;
 
+    @org.hibernate.annotations.BatchSize(size = 100)
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> orderItems = new ArrayList<>();
 
