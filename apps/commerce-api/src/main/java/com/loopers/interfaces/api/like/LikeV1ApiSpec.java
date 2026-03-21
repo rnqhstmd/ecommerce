@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 
+import java.util.List;
+
 @Tag(name = "Like API", description = "좋아요 관리 API")
 public interface LikeV1ApiSpec {
 
@@ -51,5 +53,23 @@ public interface LikeV1ApiSpec {
             @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @Parameter(description = "상품 ID", required = true)
             @PathVariable Long productId
+    );
+
+    @Operation(summary = "내 좋아요 목록 조회", description = "로그인한 사용자의 좋아요 상품 목록을 조회합니다.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = LikeV1Dto.LikeItemResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401",
+                    description = "인증 필요",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            )
+    })
+    ApiResponse<List<LikeV1Dto.LikeItemResponse>> getMyLikes(
+            @Parameter(description = "사용자 ID", required = true)
+            @RequestHeader(value = "X-USER-ID", required = false) String userId
     );
 }

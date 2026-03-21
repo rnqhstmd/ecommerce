@@ -11,4 +11,6 @@ public interface LikeRepository {
     boolean existsByUserIdAndProductId(String userId, Long productId);
     Long countByProductId(Long productId);
     Map<Long, Long> findLikeCountsByProductIds(List<Long> productIds);
+    List<Like> findByUserId(String userId);
+    List<Long> findProductIdsByUserIdAndProductIds(String userId, List<Long> productIds);
 }

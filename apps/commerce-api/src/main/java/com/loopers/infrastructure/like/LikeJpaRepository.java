@@ -22,4 +22,9 @@ public interface LikeJpaRepository extends JpaRepository<Like, Long> {
         Long getProductId();
         Long getLikeCount();
     }
+
+    List<Like> findByUserId(String userId);
+
+    @Query("SELECT l.productId FROM Like l WHERE l.userId = :userId AND l.productId IN :productIds")
+    List<Long> findProductIdsByUserIdAndProductIds(@Param("userId") String userId, @Param("productIds") List<Long> productIds);
 }

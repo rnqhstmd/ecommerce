@@ -27,6 +27,9 @@ public class Product extends BaseEntity {
     @Column(name = "brand_id", nullable = false)
     private Long brandId;
 
+    @Column(name = "like_count", nullable = false)
+    private Long likeCount = 0L;
+
     private Product(String name, ProductPrice price, Integer stock, Long brandId) {
         validateRequiredFields(name, price, stock, brandId);
         this.name = name;
@@ -68,5 +71,15 @@ public class Product extends BaseEntity {
 
     public Long getPriceValue() {
         return this.price.getValue();
+    }
+
+    public void increaseLikeCount() {
+        this.likeCount++;
+    }
+
+    public void decreaseLikeCount() {
+        if (this.likeCount > 0) {
+            this.likeCount--;
+        }
     }
 }

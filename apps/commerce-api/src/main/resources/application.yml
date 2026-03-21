@@ -42,17 +42,29 @@ spring:
     activate:
       on-profile: dev
 
+cache:
+  redis:
+    enabled: true
+
 ---
 spring:
   config:
     activate:
       on-profile: qa
 
+cache:
+  redis:
+    enabled: true
+
 ---
 spring:
   config:
     activate:
       on-profile: prd
+
+cache:
+  redis:
+    enabled: true
 
 springdoc:
   api-docs:

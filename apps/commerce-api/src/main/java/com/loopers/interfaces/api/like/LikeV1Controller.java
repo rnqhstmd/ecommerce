@@ -9,6 +9,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/likes")
 @RequiredArgsConstructor
@@ -36,6 +38,18 @@ public class LikeV1Controller implements LikeV1ApiSpec {
         validateUserId(userId);
         likeFacade.removeLike(new LikeCommand(userId, productId));
         return ApiResponse.success(null);
+    }
+
+    @GetMapping
+    @Override
+    public ApiResponse<List<LikeV1Dto.LikeItemResponse>> getMyLikes(
+            @RequestHeader(value = "X-USER-ID", required = false) String userId
+    ) {
+        validateUserId(userId);
+        List<Long> productIds = likeFacade.getMyLikes(userId);
+        List<LikeV1Dto.LikeItemResponse> responses = productIds.stream()
+                .map(LikeV1Dto.LikeItemResponse::of).toList();
+        return ApiResponse.success(responses);
     }
 
     private void validateUserId(String userId) {
