@@ -13,11 +13,14 @@ public record ProductListInfo(
         long totalElements,
         int totalPages
 ) {
-    public static ProductListInfo of(Page<Product> productPage, Map<Long, Long> likeCountMap) {
+    public static ProductListInfo of(Page<Product> productPage,
+                                     Map<Long, Long> likeCountMap,
+                                     Map<Long, Boolean> isLikedMap) {
         List<ProductContent> contents = productPage.getContent().stream()
                 .map(product -> ProductContent.of(
                         product,
-                        likeCountMap.getOrDefault(product.getId(), 0L))
+                        likeCountMap.getOrDefault(product.getId(), 0L),
+                        isLikedMap.isEmpty() ? null : isLikedMap.getOrDefault(product.getId(), false))
                 )
                 .toList();
 
@@ -35,17 +38,17 @@ public record ProductListInfo(
             String name,
             Long price,
             Long brandId,
-            String brandName,
-            Long likeCount
+            Long likeCount,
+            Boolean isLiked
     ) {
-        public static ProductContent of(Product product, Long likeCount) {
+        public static ProductContent of(Product product, Long likeCount, Boolean isLiked) {
             return new ProductContent(
                     product.getId(),
                     product.getName(),
                     product.getPriceValue(),
-                    product.getBrand().getId(),
-                    product.getBrand().getName(),
-                    likeCount
+                    product.getBrandId(),
+                    likeCount,
+                    isLiked
             );
         }
     }

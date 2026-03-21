@@ -1,6 +1,5 @@
 package com.loopers.application.product;
 
-import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.like.LikeService;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductSearchCondition;
@@ -10,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -20,10 +20,22 @@ public class ProductFacade {
     private final ProductService productService;
     private final LikeService likeService;
 
-    public ProductDetailInfo getProductDetail(Long productId) {
+    @Transactional
+    public ProductDetailInfo createProduct(String name, Long price, Integer stock, Long brandId) {
+        Product product = productService.createProduct(name, price, stock, brandId);
+        return ProductDetailInfo.of(product, 0L);
+    }
+
+    public ProductDetailInfo getProductDetail(Long productId, String userId) {
         Product product = productService.getProduct(productId);
-        Long likeCount = likeService.getLikeCount(product);
-        return ProductDetailInfo.of(product, likeCount);
+        Long likeCount = likeService.getLikeCount(product.getId());
+        Boolean isLiked = likeService.getIsLiked(userId, product.getId());
+        return ProductDetailInfo.of(product, likeCount, isLiked);
+    }
+
+    // 하위 호환 오버로드
+    public ProductDetailInfo getProductDetail(Long productId) {
+        return getProductDetail(productId, null);
     }
 
     public ProductListInfo getProducts(ProductGetListCommand command) {
@@ -33,7 +45,11 @@ public class ProductFacade {
         );
 
         Page<Product> productPage = productService.getProducts(condition);
-        Map<Long, Long> likeCountMap = likeService.getLikeCounts(productPage.getContent());
-        return ProductListInfo.of(productPage, likeCountMap);
+        List<Long> productIds = productPage.getContent().stream()
+                .map(Product::getId)
+                .toList();
+        Map<Long, Long> likeCountMap = likeService.getLikeCountsByProductIds(productIds);
+        Map<Long, Boolean> isLikedMap = likeService.getIsLikedMap(command.userId(), productIds);
+        return ProductListInfo.of(productPage, likeCountMap, isLikedMap);
     }
 }

@@ -36,5 +36,9 @@ out/
 ### VS Code ###
 .vscode/
 
+### Dev Skill ###
+.dev/
+.omc/
+
 ### Kotlin ###
 .kotlin

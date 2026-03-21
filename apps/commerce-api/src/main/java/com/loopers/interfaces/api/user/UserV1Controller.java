@@ -4,6 +4,8 @@ import com.loopers.application.user.UserCommand;
 import com.loopers.application.user.UserFacade;
 import com.loopers.application.user.UserInfo;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -29,8 +31,11 @@ public class UserV1Controller implements UserV1ApiSpec {
     @GetMapping("/me")
     @Override
     public ApiResponse<UserV1Dto.UserResponse> getMyInfo(
-            @RequestHeader("X-USER-ID") String userId
+            @RequestHeader(value = "X-USER-ID", required = false) String userId
     ) {
+        if (userId == null || userId.isBlank()) {
+            throw new CoreException(ErrorType.UNAUTHORIZED, "X-USER-ID 헤더는 필수입니다.");
+        }
         UserInfo userInfo = userFacade.getUserInfo(userId);
         UserV1Dto.UserResponse response = UserV1Dto.UserResponse.from(userInfo);
 

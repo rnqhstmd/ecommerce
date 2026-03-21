@@ -1,17 +1,16 @@
 package com.loopers.domain.order;
 
 import com.loopers.domain.BaseEntity;
-import com.loopers.domain.product.Product;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Getter
 @Table(name = "order_items")
+@SQLRestriction("deleted_at IS NULL")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OrderItem extends BaseEntity {
 
@@ -19,9 +18,11 @@ public class OrderItem extends BaseEntity {
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false)
-    private Product product;
+    @Column(name = "product_id", nullable = false)
+    private Long productId;
+
+    @Column(name = "product_name", nullable = false)
+    private String productName;
 
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
@@ -29,14 +30,15 @@ public class OrderItem extends BaseEntity {
     @Embedded
     private OrderItemPrice orderItemPrice;
 
-    private OrderItem(Product product, Integer quantity) {
-        this.product = product;
+    private OrderItem(Long productId, String productName, Long unitPrice, Integer quantity) {
+        this.productId = productId;
+        this.productName = productName;
         this.quantity = quantity;
-        this.orderItemPrice = OrderItemPrice.of(product.getPriceValue());
+        this.orderItemPrice = OrderItemPrice.of(unitPrice);
     }
 
-    public static OrderItem create(Product product, Integer quantity) {
-        return new OrderItem(product, quantity);
+    public static OrderItem create(Long productId, String productName, Long unitPrice, Integer quantity) {
+        return new OrderItem(productId, productName, unitPrice, quantity);
     }
 
     void assignOrder(Order order) {

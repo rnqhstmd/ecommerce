@@ -1,14 +1,13 @@
 package com.loopers.domain.order;
 
 import com.loopers.domain.BaseEntity;
-import com.loopers.domain.product.Product;
-import com.loopers.domain.user.User;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -17,12 +16,12 @@ import java.util.List;
 @Entity
 @Getter
 @Table(name = "orders")
+@SQLRestriction("deleted_at IS NULL")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Order extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @Column(name = "user_id", nullable = false)
+    private String userId;
 
     @Embedded
     private OrderTotalAmount totalAmount;
@@ -37,26 +36,26 @@ public class Order extends BaseEntity {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> orderItems = new ArrayList<>();
 
-    private Order(User user) {
-        validateUser(user);
-        this.user = user;
+    private Order(String userId) {
+        validateUserId(userId);
+        this.userId = userId;
         this.totalAmount = OrderTotalAmount.zero();
         this.status = OrderStatus.PENDING;
     }
 
-    public static Order create(User user) {
-        return new Order(user);
+    public static Order create(String userId) {
+        return new Order(userId);
     }
 
-    public void addOrderItem(Product product, Integer quantity) {
-        if (product == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "상품은 필수입니다.");
+    public void addOrderItem(Long productId, String productName, Long unitPrice, Integer quantity) {
+        if (productId == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "상품 ID는 필수입니다.");
         }
         if (quantity == null || quantity <= 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "수량은 1 이상이어야 합니다.");
         }
 
-        OrderItem orderItem = OrderItem.create(product, quantity);
+        OrderItem orderItem = OrderItem.create(productId, productName, unitPrice, quantity);
         this.orderItems.add(orderItem);
         orderItem.assignOrder(this);
 
@@ -81,9 +80,9 @@ public class Order extends BaseEntity {
         }
     }
 
-    private void validateUser(User user) {
-        if (user == null) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "사용자는 필수입니다.");
+    private void validateUserId(String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "사용자 ID는 필수입니다.");
         }
     }
 
