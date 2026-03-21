@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,8 +38,13 @@ class ProductV1ApiE2ETest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
+    @Autowired
+    private RedisTemplate<String, String> redisTemplate;
+
     @AfterEach
     void tearDown() {
+        // 인기 상품 캐시 초기화
+        redisTemplate.delete("product:popular");
         databaseCleanUp.truncateAllTables();
     }
 
@@ -334,5 +340,164 @@ class ProductV1ApiE2ETest {
                 () -> assertThat(notLikedResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(notLikedResponse.getBody().data().isLiked()).isFalse()
         );
+    }
+
+    @DisplayName("PUT /api/v1/products/{id} - 상품 수정에 성공한다.")
+    @Test
+    void updateProduct_success() {
+        // arrange
+        Brand brand = brandRepository.save(Brand.create("Update Brand"));
+        Product product = productRepository.save(Product.create("Before Update", 10000L, 50, brand.getId()));
+
+        ProductV1Dto.UpdateRequest request = new ProductV1Dto.UpdateRequest("After Update", 20000L);
+
+        // act
+        ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> response =
+                testRestTemplate.exchange(
+                        "/api/v1/products/" + product.getId(),
+                        HttpMethod.PUT,
+                        new HttpEntity<>(request),
+                        new ParameterizedTypeReference<>() {}
+                );
+
+        // assert
+        assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody()).isNotNull(),
+                () -> assertThat(response.getBody().data().productName()).isEqualTo("After Update"),
+                () -> assertThat(response.getBody().data().price()).isEqualTo(20000L)
+        );
+    }
+
+    @DisplayName("PUT /api/v1/products/{id} - 존재하지 않는 상품 수정 시 404를 반환한다.")
+    @Test
+    void updateProduct_returnsNotFound_whenProductNotExists() {
+        // arrange
+        ProductV1Dto.UpdateRequest request = new ProductV1Dto.UpdateRequest("New Name", 5000L);
+
+        // act
+        ResponseEntity<ApiResponse<Object>> response =
+                testRestTemplate.exchange(
+                        "/api/v1/products/99999",
+                        HttpMethod.PUT,
+                        new HttpEntity<>(request),
+                        new ParameterizedTypeReference<>() {}
+                );
+
+        // assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @DisplayName("POST /api/v1/products/{id}/stock - 재고 입고에 성공한다.")
+    @Test
+    void increaseStock_success() {
+        // arrange
+        Brand brand = brandRepository.save(Brand.create("Stock Brand"));
+        Product product = productRepository.save(Product.create("Stock Product", 5000L, 50, brand.getId()));
+
+        ProductV1Dto.StockRequest request = new ProductV1Dto.StockRequest(30);
+
+        // act
+        ResponseEntity<ApiResponse<ProductV1Dto.StockResponse>> response =
+                testRestTemplate.exchange(
+                        "/api/v1/products/" + product.getId() + "/stock",
+                        HttpMethod.POST,
+                        new HttpEntity<>(request),
+                        new ParameterizedTypeReference<>() {}
+                );
+
+        // assert
+        assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody()).isNotNull(),
+                () -> assertThat(response.getBody().data().productId()).isEqualTo(product.getId()),
+                () -> assertThat(response.getBody().data().stock()).isEqualTo(80)
+        );
+    }
+
+    @DisplayName("POST /api/v1/products/{id}/stock - 존재하지 않는 상품 재고 입고 시 404를 반환한다.")
+    @Test
+    void increaseStock_returnsNotFound_whenProductNotExists() {
+        // arrange
+        ProductV1Dto.StockRequest request = new ProductV1Dto.StockRequest(10);
+
+        // act
+        ResponseEntity<ApiResponse<Object>> response =
+                testRestTemplate.exchange(
+                        "/api/v1/products/99999/stock",
+                        HttpMethod.POST,
+                        new HttpEntity<>(request),
+                        new ParameterizedTypeReference<>() {}
+                );
+
+        // assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @DisplayName("GET /api/v1/products/popular - 인기 상품 조회에 성공한다.")
+    @Test
+    void getPopularProducts_success() {
+        // arrange
+        Brand brand = brandRepository.save(Brand.create("Popular Brand"));
+        Product product1 = productRepository.save(Product.create("Popular Product 1", 1000L, 10, brand.getId()));
+        Product product2 = productRepository.save(Product.create("Popular Product 2", 2000L, 10, brand.getId()));
+        Product product3 = productRepository.save(Product.create("Popular Product 3", 3000L, 10, brand.getId()));
+
+        // 좋아요 수 설정 (직접 DB에 likeCount 설정)
+        product1.increaseLikeCount();
+        product1.increaseLikeCount();
+        product1.increaseLikeCount();
+        productRepository.save(product1);
+
+        product2.increaseLikeCount();
+        productRepository.save(product2);
+
+        // act
+        ResponseEntity<String> response =
+                testRestTemplate.exchange(
+                        "/api/v1/products/popular?limit=3",
+                        HttpMethod.GET,
+                        null,
+                        String.class
+                );
+
+        // assert
+        assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody()).isNotNull(),
+                () -> assertThat(response.getBody()).contains("\"products\"")
+        );
+    }
+
+    @DisplayName("GET /api/v1/products/popular - limit이 0 이하이면 400을 반환한다.")
+    @Test
+    void getPopularProducts_returnsBadRequest_whenLimitIsInvalid() {
+        // act
+        ResponseEntity<ApiResponse<Object>> response =
+                testRestTemplate.exchange(
+                        "/api/v1/products/popular?limit=0",
+                        HttpMethod.GET,
+                        null,
+                        new ParameterizedTypeReference<>() {}
+                );
+
+        // assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @DisplayName("GET /api/v1/products/popular - limit이 101이면 400을 반환한다.")
+    @Test
+    void getPopularProducts_returnsBadRequest_whenLimitExceedsMax() {
+        // act
+        ResponseEntity<ApiResponse<Object>> response =
+                testRestTemplate.exchange(
+                        "/api/v1/products/popular?limit=101",
+                        HttpMethod.GET,
+                        null,
+                        new ParameterizedTypeReference<>() {}
+                );
+
+        // assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 }
