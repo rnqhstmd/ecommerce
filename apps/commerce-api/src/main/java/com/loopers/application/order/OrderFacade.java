@@ -1,5 +1,8 @@
 package com.loopers.application.order;
 
+import com.loopers.domain.coupon.CouponPolicy;
+import com.loopers.domain.coupon.CouponService;
+import com.loopers.domain.coupon.UserCoupon;
 import com.loopers.domain.order.*;
 import com.loopers.domain.point.PointService;
 import com.loopers.domain.product.Product;
@@ -31,6 +34,7 @@ public class OrderFacade {
     private final StockDeductionService stockDeductionService;
     private final PointService pointService;
     private final ProductService productService;
+    private final CouponService couponService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -51,7 +55,30 @@ public class OrderFacade {
         }
 
         Long totalAmount = order.getTotalAmountValue();
-        pointService.usePoint(command.userId(), totalAmount);
+
+        // 쿠폰 적용
+        long discountAmount = 0L;
+        UserCoupon userCoupon = null;
+        if (command.couponId() != null) {
+            userCoupon = couponService.getUserCouponByIdAndUserId(command.couponId(), command.userId());
+            if (userCoupon.isUsed()) {
+                throw new CoreException(ErrorType.BAD_REQUEST, "이미 사용된 쿠폰입니다.");
+            }
+            CouponPolicy policy = couponService.getCouponPolicy(userCoupon.getCouponPolicyId());
+            if (!policy.isValid()) {
+                throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰 유효기간이 아닙니다.");
+            }
+            discountAmount = policy.calculateDiscount(totalAmount);
+        }
+
+        order.applyDiscount(discountAmount, userCoupon != null ? userCoupon.getId() : null);
+
+        long payAmount = totalAmount - discountAmount;
+        pointService.usePoint(command.userId(), payAmount);
+
+        if (userCoupon != null) {
+            couponService.markCouponUsed(userCoupon);
+        }
 
         order.completePayment();
 
@@ -92,10 +119,15 @@ public class OrderFacade {
         // 4. 재고 복구 (ID 오름차순 비관적 락)
         restoreStock(order);
 
-        // 5. 포인트 환불 + PointHistory(REFUND) 저장
-        pointService.refundPoint(userId, order.getTotalAmountValue());
+        // 5. 포인트 환불 — 실제 결제금액(totalAmount - discountAmount)만 환불
+        pointService.refundPoint(userId, order.getActualPaymentAmount());
 
-        // 6. 이벤트 발행
+        // 6. 쿠폰 사용 복구
+        if (order.getUserCouponId() != null) {
+            couponService.restoreCoupon(order.getUserCouponId());
+        }
+
+        // 7. 이벤트 발행
         eventPublisher.publishEvent(OrderCancelledEvent.from(order));
 
         return OrderInfo.CancelInfo.from(order);

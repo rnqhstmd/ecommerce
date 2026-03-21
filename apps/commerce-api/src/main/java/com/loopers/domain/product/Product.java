@@ -27,6 +27,9 @@ public class Product extends BaseEntity {
     @Column(name = "brand_id", nullable = false)
     private Long brandId;
 
+    @Column(name = "category_id")
+    private Long categoryId;
+
     @Column(name = "like_count", nullable = false)
     private Long likeCount = 0L;
 
@@ -103,5 +106,9 @@ public class Product extends BaseEntity {
             }
             this.price = ProductPrice.of(price);
         }
+    }
+
+    public void updateCategoryId(Long categoryId) {
+        this.categoryId = categoryId;
     }
 }

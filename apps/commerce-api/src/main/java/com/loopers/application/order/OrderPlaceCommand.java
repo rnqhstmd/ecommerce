@@ -4,8 +4,13 @@ import java.util.List;
 
 public record OrderPlaceCommand(
         String userId,
-        List<OrderItemCommand> items
+        List<OrderItemCommand> items,
+        Long couponId
 ) {
+    public OrderPlaceCommand(String userId, List<OrderItemCommand> items) {
+        this(userId, items, null);
+    }
+
     public record OrderItemCommand(
             Long productId,
             Integer quantity
