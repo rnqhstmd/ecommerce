@@ -62,6 +62,16 @@ public class ProductService {
         // 캐시 무효화만 수행
     }
 
+    /**
+     * ID 목록으로 상품을 조회한다. 삭제된 상품은 결과에서 자연스럽게 제외되며 예외를 던지지 않는다.
+     */
+    public List<Product> findProductsByIds(Collection<Long> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return productRepository.findAllByIds(ids);
+    }
+
     public List<Product> findTopByLikeCountDesc(int limit) {
         return productRepository.findTopByLikeCountDesc(limit);
     }

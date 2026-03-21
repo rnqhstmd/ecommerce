@@ -61,6 +61,7 @@ public class CartV1Controller implements CartV1ApiSpec {
         return ApiResponse.success(CartV1Dto.CheckoutResponse.from(orderInfo));
     }
 
+    // TODO: validateUserId 로직이 여러 Controller에 중복됨. 향후 HandlerInterceptor로 추출 필요
     private void validateUserId(String userId) {
         if (userId == null || userId.isBlank()) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "X-USER-ID 헤더는 필수입니다.");

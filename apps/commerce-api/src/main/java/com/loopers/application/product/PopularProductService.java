@@ -36,21 +36,8 @@ public class PopularProductService {
                             t -> t.getScore() != null ? t.getScore() : 0.0
                     ));
 
-            // DB에서 상품 정보 조회 (삭제된 상품 필터링)
-            List<Product> products;
-            try {
-                products = productService.getProductsByIds(productIds);
-            } catch (Exception e) {
-                // 일부 상품 삭제된 경우 개별 조회
-                products = new ArrayList<>();
-                for (Long id : productIds) {
-                    try {
-                        products.add(productService.getProduct(id));
-                    } catch (Exception ignored) {
-                        // skip deleted
-                    }
-                }
-            }
+            // DB에서 상품 정보 조회 (삭제된 상품은 결과에서 자연스럽게 제외)
+            List<Product> products = productService.findProductsByIds(productIds);
 
             return products.stream()
                     .map(p -> PopularProductInfo.of(p, scoreMap.getOrDefault(p.getId(), 0.0).longValue()))

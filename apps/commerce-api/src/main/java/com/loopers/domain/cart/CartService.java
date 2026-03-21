@@ -23,10 +23,10 @@ public class CartService {
     }
 
     public void removeItem(String userId, Long productId) {
-        if (!cartRepository.existsItem(userId, productId)) {
+        boolean removed = cartRepository.removeItem(userId, productId);
+        if (!removed) {
             throw new CoreException(ErrorType.NOT_FOUND, "장바구니에 해당 상품이 없습니다.");
         }
-        cartRepository.removeItem(userId, productId);
     }
 
     public Map<Long, Integer> getCartItems(String userId) {

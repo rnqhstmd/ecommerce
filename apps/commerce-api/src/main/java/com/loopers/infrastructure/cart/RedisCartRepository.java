@@ -5,9 +5,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Repository;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
@@ -40,13 +40,11 @@ public class RedisCartRepository implements CartRepository {
     public Map<Long, Integer> getCartItems(String userId) {
         String key = cartKey(userId);
         Map<Object, Object> entries = redisTemplate.opsForHash().entries(key);
-        Map<Long, Integer> result = new HashMap<>();
-        for (Map.Entry<Object, Object> entry : entries.entrySet()) {
-            Long productId = Long.parseLong(entry.getKey().toString());
-            Integer quantity = Integer.parseInt(entry.getValue().toString());
-            result.put(productId, quantity);
-        }
-        return result;
+        return entries.entrySet().stream()
+                .collect(Collectors.toMap(
+                        entry -> Long.parseLong(entry.getKey().toString()),
+                        entry -> Integer.parseInt(entry.getValue().toString())
+                ));
     }
 
     @Override

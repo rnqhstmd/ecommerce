@@ -9,12 +9,14 @@ import com.loopers.domain.product.ProductService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class CartFacade {
@@ -37,22 +39,15 @@ public class CartFacade {
             return List.of();
         }
 
-        List<CartItemInfo> result = new ArrayList<>();
-        for (Map.Entry<Long, Integer> entry : cartItems.entrySet()) {
-            try {
-                Product product = productService.getProduct(entry.getKey());
-                result.add(CartItemInfo.of(product, entry.getValue()));
-            } catch (CoreException e) {
-                // soft-delete된 상품은 응답에서 제외 (Redis 항목은 유지)
-                if (e.getErrorType() == ErrorType.NOT_FOUND) {
-                    continue;
-                }
-                throw e;
-            }
-        }
-        return result;
+        // N+1 해소: productIds를 모아 일괄 조회, soft-delete된 상품은 결과에서 자연스럽게 제외
+        List<Product> products = productService.findProductsByIds(cartItems.keySet());
+
+        return products.stream()
+                .map(product -> CartItemInfo.of(product, cartItems.get(product.getId())))
+                .toList();
     }
 
+    @Transactional
     public OrderInfo checkout(String userId) {
         Map<Long, Integer> cartItems = cartService.getCartItems(userId);
         if (cartItems.isEmpty()) {
@@ -66,8 +61,12 @@ public class CartFacade {
         OrderPlaceCommand command = new OrderPlaceCommand(userId, itemCommands);
         OrderInfo orderInfo = orderFacade.placeOrder(command);
 
-        // 주문 성공 후 장바구니 삭제
-        cartService.clearCart(userId);
+        // 주문 성공 후 장바구니 삭제 (Redis 작업이므로 RDB 트랜잭션에 포함되지 않음)
+        try {
+            cartService.clearCart(userId);
+        } catch (Exception e) {
+            log.warn("장바구니 삭제 실패 (주문은 정상 처리됨). userId={}", userId, e);
+        }
 
         return orderInfo;
     }

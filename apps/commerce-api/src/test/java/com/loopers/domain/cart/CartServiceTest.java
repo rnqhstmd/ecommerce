@@ -85,7 +85,7 @@ class CartServiceTest {
         @Test
         void removeItem_success() {
             // arrange
-            when(cartRepository.existsItem(USER_ID, PRODUCT_ID)).thenReturn(true);
+            when(cartRepository.removeItem(USER_ID, PRODUCT_ID)).thenReturn(true);
 
             // act
             cartService.removeItem(USER_ID, PRODUCT_ID);
@@ -98,15 +98,13 @@ class CartServiceTest {
         @Test
         void removeItem_throwsException_whenItemNotFound() {
             // arrange
-            when(cartRepository.existsItem(USER_ID, PRODUCT_ID)).thenReturn(false);
+            when(cartRepository.removeItem(USER_ID, PRODUCT_ID)).thenReturn(false);
 
             // act & assert
             assertThatThrownBy(() -> cartService.removeItem(USER_ID, PRODUCT_ID))
                     .isInstanceOf(CoreException.class)
                     .extracting(ex -> ((CoreException) ex).getErrorType())
                     .isEqualTo(ErrorType.NOT_FOUND);
-
-            verify(cartRepository, never()).removeItem(anyString(), anyLong());
         }
     }
 
