@@ -66,11 +66,11 @@ class OrderServiceIntegrationTest {
 
         order1 = Order.create(userId1);
         order1.addOrderItem(product1.getId(), product1.getName(), product1.getPriceValue(), 1);
-        orderService.save(order1);
+        order1 = orderService.save(order1);
 
         order2 = Order.create(userId2);
         order2.addOrderItem(product1.getId(), product1.getName(), product1.getPriceValue(), 2);
-        orderService.save(order2);
+        order2 = orderService.save(order2);
     }
 
     @DisplayName("주문 저장")
