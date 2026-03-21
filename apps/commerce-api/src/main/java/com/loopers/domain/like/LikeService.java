@@ -1,10 +1,7 @@
 package com.loopers.domain.like;
 
-import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductService;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,9 +27,7 @@ public class LikeService {
         Like like = Like.create(userId, productId);
         likeRepository.save(like);
 
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다."));
-        product.increaseLikeCount();
+        productRepository.incrementLikeCount(productId);
         productService.evictProductCache(productId);
     }
 
@@ -41,9 +36,7 @@ public class LikeService {
         likeRepository.findByUserIdAndProductId(userId, productId)
                 .ifPresent(like -> {
                     likeRepository.delete(like);
-                    Product product = productRepository.findById(productId)
-                            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다."));
-                    product.decreaseLikeCount();
+                    productRepository.decrementLikeCount(productId);
                     productService.evictProductCache(productId);
                 });
     }
@@ -61,15 +54,19 @@ public class LikeService {
     }
 
     public Boolean getIsLiked(String userId, Long productId) {
-        if (userId == null) return null;
+        if (isUserIdMissing(userId)) return null;
         return likeRepository.existsByUserIdAndProductId(userId, productId);
     }
 
     public Map<Long, Boolean> getIsLikedMap(String userId, List<Long> productIds) {
-        if (userId == null || productIds.isEmpty()) return Collections.emptyMap();
+        if (isUserIdMissing(userId) || productIds.isEmpty()) return Collections.emptyMap();
         List<Long> likedIds = likeRepository.findProductIdsByUserIdAndProductIds(userId, productIds);
         Set<Long> likedSet = new HashSet<>(likedIds);
         return productIds.stream()
                 .collect(Collectors.toMap(Function.identity(), likedSet::contains));
+    }
+
+    private boolean isUserIdMissing(String userId) {
+        return userId == null || userId.isBlank();
     }
 }

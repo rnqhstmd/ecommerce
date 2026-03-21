@@ -38,7 +38,8 @@ public class ProductV1Controller implements ProductV1ApiSpec {
             @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @PathVariable Long productId
     ) {
-        ProductDetailInfo info = productFacade.getProductDetail(productId, userId);
+        String normalizedUserId = (userId == null || userId.isBlank()) ? null : userId;
+        ProductDetailInfo info = productFacade.getProductDetail(productId, normalizedUserId);
         return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
     }
 
@@ -54,9 +55,10 @@ public class ProductV1Controller implements ProductV1ApiSpec {
         if (page < 0 || size <= 0 || size > 100) {
             throw new CoreException(ErrorType.BAD_REQUEST, "page는 0 이상, size는 1~100 이어야 합니다.");
         }
+        String normalizedUserId = (userId == null || userId.isBlank()) ? null : userId;
         Sort sortOrder = parseSort(sort);
         Pageable pageable = PageRequest.of(page, size, sortOrder);
-        ProductGetListCommand command = new ProductGetListCommand(brandId, userId, pageable);
+        ProductGetListCommand command = new ProductGetListCommand(brandId, normalizedUserId, pageable);
         ProductListInfo info = productFacade.getProducts(command);
         return ApiResponse.success(ProductV1Dto.ProductListResponse.from(info));
     }

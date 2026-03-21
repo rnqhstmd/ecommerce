@@ -13,4 +13,6 @@ public interface ProductRepository {
     List<Product> findAllByIds(Collection<Long> ids);
     List<Product> findAllByIdsWithLock(List<Long> ids);
     Page<Product> findProducts(Pageable pageable, Long brandId);
+    void incrementLikeCount(Long productId);
+    void decrementLikeCount(Long productId);
 }

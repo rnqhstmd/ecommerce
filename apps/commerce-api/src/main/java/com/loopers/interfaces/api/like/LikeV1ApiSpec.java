@@ -3,6 +3,7 @@ package com.loopers.interfaces.api.like;
 import com.loopers.interfaces.api.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -60,7 +61,7 @@ public interface LikeV1ApiSpec {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200",
                     description = "조회 성공",
-                    content = @Content(schema = @Schema(implementation = LikeV1Dto.LikeItemResponse.class))
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = LikeV1Dto.LikeItemResponse.class)))
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401",
