@@ -53,6 +53,11 @@ public class UserCoupon extends BaseEntity {
         this.usedAt = ZonedDateTime.now();
     }
 
+    public void markUnused() {
+        this.used = false;
+        this.usedAt = null;
+    }
+
     public boolean isOwnedBy(String userId) {
         return this.userId.equals(userId);
     }

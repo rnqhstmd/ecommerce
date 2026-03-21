@@ -1,6 +1,6 @@
 package com.loopers.interfaces.api.category;
 
-import com.loopers.domain.category.Category;
+import com.loopers.application.category.CategoryInfo;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -22,13 +22,13 @@ public class CategoryV1Dto {
             int depth,
             ZonedDateTime createdAt
     ) {
-        public static CategoryResponse from(Category category) {
+        public static CategoryResponse from(CategoryInfo info) {
             return new CategoryResponse(
-                    category.getId(),
-                    category.getName(),
-                    category.getParentId(),
-                    category.getDepth(),
-                    category.getCreatedAt()
+                    info.categoryId(),
+                    info.name(),
+                    info.parentId(),
+                    info.depth(),
+                    info.createdAt()
             );
         }
     }

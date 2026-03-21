@@ -71,6 +71,8 @@ public class OrderFacade {
             discountAmount = policy.calculateDiscount(totalAmount);
         }
 
+        order.applyDiscount(discountAmount, userCoupon != null ? userCoupon.getId() : null);
+
         long payAmount = totalAmount - discountAmount;
         pointService.usePoint(command.userId(), payAmount);
 
@@ -117,10 +119,15 @@ public class OrderFacade {
         // 4. 재고 복구 (ID 오름차순 비관적 락)
         restoreStock(order);
 
-        // 5. 포인트 환불 + PointHistory(REFUND) 저장
-        pointService.refundPoint(userId, order.getTotalAmountValue());
+        // 5. 포인트 환불 — 실제 결제금액(totalAmount - discountAmount)만 환불
+        pointService.refundPoint(userId, order.getActualPaymentAmount());
 
-        // 6. 이벤트 발행
+        // 6. 쿠폰 사용 복구
+        if (order.getUserCouponId() != null) {
+            couponService.restoreCoupon(order.getUserCouponId());
+        }
+
+        // 7. 이벤트 발행
         eventPublisher.publishEvent(OrderCancelledEvent.from(order));
 
         return OrderInfo.CancelInfo.from(order);

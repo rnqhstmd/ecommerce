@@ -21,7 +21,7 @@ public class CouponFacade {
 
     @Transactional
     public CouponInfo issueCoupon(Long couponPolicyId, String userId) {
-        CouponPolicy policy = couponService.getCouponPolicy(couponPolicyId);
+        CouponPolicy policy = couponService.getCouponPolicyWithLock(couponPolicyId);
 
         if (!policy.isValid()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰 유효기간이 아닙니다.");

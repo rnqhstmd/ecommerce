@@ -22,4 +22,9 @@ public class CouponPolicyRepositoryImpl implements CouponPolicyRepository {
     public Optional<CouponPolicy> findById(Long id) {
         return jpaRepository.findById(id);
     }
+
+    @Override
+    public Optional<CouponPolicy> findByIdWithLock(Long id) {
+        return jpaRepository.findByIdWithLock(id);
+    }
 }

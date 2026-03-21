@@ -30,6 +30,12 @@ public class Order extends BaseEntity {
     @Column(name = "status", nullable = false, length = 20)
     private OrderStatus status;
 
+    @Column(name = "discount_amount")
+    private Long discountAmount;
+
+    @Column(name = "user_coupon_id")
+    private Long userCouponId;
+
     @Column(name = "paid_at")
     private ZonedDateTime paidAt;
 
@@ -44,6 +50,7 @@ public class Order extends BaseEntity {
         validateUserId(userId);
         this.userId = userId;
         this.totalAmount = OrderTotalAmount.zero();
+        this.discountAmount = 0L;
         this.status = OrderStatus.PENDING;
     }
 
@@ -103,8 +110,22 @@ public class Order extends BaseEntity {
         }
     }
 
+    public void applyDiscount(long discountAmount, Long userCouponId) {
+        this.discountAmount = discountAmount;
+        this.userCouponId = userCouponId;
+    }
+
+    public long getActualPaymentAmount() {
+        long discount = this.discountAmount != null ? this.discountAmount : 0L;
+        return this.totalAmount.getValue() - discount;
+    }
+
     public Long getTotalAmountValue() {
         return this.totalAmount.getValue();
+    }
+
+    public Long getDiscountAmount() {
+        return this.discountAmount != null ? this.discountAmount : 0L;
     }
 
     public List<OrderItem> getOrderItems() {

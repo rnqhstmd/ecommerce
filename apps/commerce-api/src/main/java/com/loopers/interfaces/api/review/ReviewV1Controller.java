@@ -11,12 +11,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
+@RequestMapping("/api/v1")
 @RequiredArgsConstructor
-public class ReviewV1Controller {
+public class ReviewV1Controller implements ReviewV1ApiSpec {
 
     private final ReviewFacade reviewFacade;
 
-    @PostMapping("/api/v1/reviews")
+    @PostMapping("/reviews")
+    @Override
     public ApiResponse<ReviewV1Dto.ReviewResponse> createReview(
             @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @RequestBody @Valid ReviewV1Dto.CreateReviewRequest request
@@ -28,7 +30,8 @@ public class ReviewV1Controller {
         return ApiResponse.success(ReviewV1Dto.ReviewResponse.from(info));
     }
 
-    @GetMapping("/api/v1/products/{productId}/reviews")
+    @GetMapping("/products/{productId}/reviews")
+    @Override
     public ApiResponse<ReviewV1Dto.ProductReviewResponse> getProductReviews(
             @PathVariable Long productId,
             @RequestParam(defaultValue = "0") int page,

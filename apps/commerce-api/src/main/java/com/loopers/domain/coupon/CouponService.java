@@ -47,4 +47,16 @@ public class CouponService {
     public void markCouponUsed(UserCoupon userCoupon) {
         userCoupon.markUsed();
     }
+
+    @Transactional
+    public void restoreCoupon(Long userCouponId) {
+        UserCoupon userCoupon = userCouponRepository.findById(userCouponId)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "사용자 쿠폰을 찾을 수 없습니다."));
+        userCoupon.markUnused();
+    }
+
+    public CouponPolicy getCouponPolicyWithLock(Long id) {
+        return couponPolicyRepository.findByIdWithLock(id)
+                .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "쿠폰 정책을 찾을 수 없습니다."));
+    }
 }

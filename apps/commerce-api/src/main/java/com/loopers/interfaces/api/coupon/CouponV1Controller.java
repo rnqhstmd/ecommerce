@@ -11,11 +11,12 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/coupons")
 @RequiredArgsConstructor
-public class CouponV1Controller {
+public class CouponV1Controller implements CouponV1ApiSpec {
 
     private final CouponFacade couponFacade;
 
     @PostMapping("/{id}/issue")
+    @Override
     public ApiResponse<CouponV1Dto.CouponIssueResponse> issueCoupon(
             @PathVariable Long id,
             @RequestHeader(value = "X-USER-ID", required = false) String userId
