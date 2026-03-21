@@ -64,11 +64,11 @@ class OrderServiceIntegrationTest {
 
         order1 = Order.create(user1);
         order1.addOrderItem(product1, 1);
-        orderService.save(order1);
+        order1 = orderService.save(order1);
 
         order2 = Order.create(user2);
         order2.addOrderItem(product1, 2);
-        orderService.save(order2);
+        order2 = orderService.save(order2);
     }
 
     @DisplayName("주문 저장")
