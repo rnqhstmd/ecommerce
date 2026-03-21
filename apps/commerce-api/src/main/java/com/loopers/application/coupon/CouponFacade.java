@@ -29,12 +29,9 @@ public class CouponFacade {
 
         String stockKey = COUPON_STOCK_KEY_PREFIX + couponPolicyId;
 
-        // Redis에 키가 없으면 초기화
-        Boolean hasKey = redisTemplate.hasKey(stockKey);
-        if (Boolean.FALSE.equals(hasKey)) {
-            int remaining = policy.getTotalQuantity() - policy.getIssuedQuantity();
-            redisTemplate.opsForValue().set(stockKey, String.valueOf(remaining));
-        }
+        // Redis에 키가 없으면 원자적으로 초기화 (race condition 방지)
+        int remainingStock = policy.getTotalQuantity() - policy.getIssuedQuantity();
+        redisTemplate.opsForValue().setIfAbsent(stockKey, String.valueOf(remainingStock));
 
         // Redis DECR로 원자적 수량 제어
         Long remaining = redisTemplate.opsForValue().decrement(stockKey);
@@ -49,8 +46,8 @@ public class CouponFacade {
             policy.increaseIssuedQuantity();
             couponService.saveCouponPolicy(policy);
             return CouponInfo.from(userCoupon, policy);
-        } catch (CoreException e) {
-            // 중복 발급 등 실패 시 Redis 복구
+        } catch (Exception e) {
+            // 중복 발급, DB 예외 등 모든 실패 시 Redis 복구
             redisTemplate.opsForValue().increment(stockKey);
             throw e;
         }

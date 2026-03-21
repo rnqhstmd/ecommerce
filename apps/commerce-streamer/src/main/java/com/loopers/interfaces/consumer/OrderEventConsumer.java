@@ -30,6 +30,7 @@ public class OrderEventConsumer {
             List<ConsumerRecord<String, OrderEventPayload.OrderPlacedPayload>> messages,
             Acknowledgment acknowledgment
     ) {
+        boolean allSucceeded = true;
         for (ConsumerRecord<String, OrderEventPayload.OrderPlacedPayload> record : messages) {
             try {
                 OrderEventPayload.OrderPlacedPayload payload = record.value();
@@ -43,9 +44,14 @@ public class OrderEventConsumer {
                 notificationService.send(notification);
             } catch (Exception e) {
                 log.error("OrderPlacedEvent 처리 실패: {}", e.getMessage(), e);
+                allSucceeded = false;
             }
         }
-        acknowledgment.acknowledge();
+        if (allSucceeded) {
+            acknowledgment.acknowledge();
+        } else {
+            log.warn("OrderPlacedEvent 배치 중 일부 실패 — ack 생략하여 재전송 유도");
+        }
     }
 
     @KafkaListener(
@@ -56,6 +62,7 @@ public class OrderEventConsumer {
             List<ConsumerRecord<String, OrderEventPayload.OrderCancelledPayload>> messages,
             Acknowledgment acknowledgment
     ) {
+        boolean allSucceeded = true;
         for (ConsumerRecord<String, OrderEventPayload.OrderCancelledPayload> record : messages) {
             try {
                 OrderEventPayload.OrderCancelledPayload payload = record.value();
@@ -69,8 +76,13 @@ public class OrderEventConsumer {
                 notificationService.send(notification);
             } catch (Exception e) {
                 log.error("OrderCancelledEvent 처리 실패: {}", e.getMessage(), e);
+                allSucceeded = false;
             }
         }
-        acknowledgment.acknowledge();
+        if (allSucceeded) {
+            acknowledgment.acknowledge();
+        } else {
+            log.warn("OrderCancelledEvent 배치 중 일부 실패 — ack 생략하여 재전송 유도");
+        }
     }
 }
