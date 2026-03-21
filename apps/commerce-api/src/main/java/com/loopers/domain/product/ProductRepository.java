@@ -16,4 +16,5 @@ public interface ProductRepository {
     Page<Product> findProducts(ProductSearchCondition condition);
     void incrementLikeCount(Long productId);
     void decrementLikeCount(Long productId);
+    List<Product> findTopByLikeCountDesc(int limit);
 }

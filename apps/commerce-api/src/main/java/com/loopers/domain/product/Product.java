@@ -86,4 +86,22 @@ public class Product extends BaseEntity {
             this.likeCount--;
         }
     }
+
+    public void updateName(String name) {
+        if (name != null && !name.isBlank()) {
+            if (name.length() > 100) {
+                throw new CoreException(ErrorType.BAD_REQUEST, "상품명은 100자 이하여야 합니다.");
+            }
+            this.name = name;
+        }
+    }
+
+    public void updatePrice(Long price) {
+        if (price != null) {
+            if (price <= 0) {
+                throw new CoreException(ErrorType.BAD_REQUEST, "가격은 1 이상이어야 합니다.");
+            }
+            this.price = ProductPrice.of(price);
+        }
+    }
 }

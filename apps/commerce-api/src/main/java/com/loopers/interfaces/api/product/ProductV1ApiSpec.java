@@ -53,6 +53,66 @@ public interface ProductV1ApiSpec {
             @PathVariable Long productId
     );
 
+    @Operation(summary = "상품 수정", description = "상품의 이름 또는 가격을 수정합니다.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", description = "수정 성공",
+                    content = @Content(schema = @Schema(implementation = ProductV1Dto.ProductResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400", description = "잘못된 요청",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404", description = "상품을 찾을 수 없음",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            )
+    })
+    ApiResponse<ProductV1Dto.ProductResponse> updateProduct(
+            @Parameter(description = "상품 ID", required = true)
+            @PathVariable Long productId,
+            @Parameter(description = "상품 수정 요청", required = true)
+            @RequestBody ProductV1Dto.UpdateRequest request
+    );
+
+    @Operation(summary = "재고 입고", description = "상품의 재고를 증가시킵니다.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", description = "입고 성공",
+                    content = @Content(schema = @Schema(implementation = ProductV1Dto.StockResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400", description = "잘못된 요청",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404", description = "상품을 찾을 수 없음",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            )
+    })
+    ApiResponse<ProductV1Dto.StockResponse> increaseStock(
+            @Parameter(description = "상품 ID", required = true)
+            @PathVariable Long productId,
+            @Parameter(description = "입고 요청", required = true)
+            @RequestBody ProductV1Dto.StockRequest request
+    );
+
+    @Operation(summary = "인기 상품 TOP N", description = "좋아요 수 기준 인기 상품을 조회합니다.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = ProductV1Dto.PopularProductsResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400", description = "잘못된 요청",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            )
+    })
+    ApiResponse<ProductV1Dto.PopularProductsResponse> getPopularProducts(
+            @Parameter(description = "조회 개수 (1~100, 기본 10)")
+            @RequestParam(defaultValue = "10") int limit
+    );
+
     @Operation(summary = "상품 목록 조회", description = "상품 목록을 페이지네이션으로 조회합니다.")
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(

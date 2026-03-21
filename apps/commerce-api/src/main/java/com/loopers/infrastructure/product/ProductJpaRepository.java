@@ -32,4 +32,7 @@ public interface ProductJpaRepository extends JpaRepository<Product, Long> {
     @Modifying
     @Query("UPDATE Product p SET p.likeCount = CASE WHEN p.likeCount > 0 THEN p.likeCount - 1 ELSE 0 END WHERE p.id = :productId")
     void decrementLikeCount(@Param("productId") Long productId);
+
+    @Query("SELECT p FROM Product p ORDER BY p.likeCount DESC")
+    List<Product> findTopByLikeCountDesc(org.springframework.data.domain.Pageable pageable);
 }

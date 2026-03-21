@@ -61,4 +61,8 @@ public class ProductService {
     public void evictProductCache(Long id) {
         // 캐시 무효화만 수행
     }
+
+    public List<Product> findTopByLikeCountDesc(int limit) {
+        return productRepository.findTopByLikeCountDesc(limit);
+    }
 }

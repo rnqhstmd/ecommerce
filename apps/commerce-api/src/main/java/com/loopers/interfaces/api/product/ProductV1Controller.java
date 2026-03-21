@@ -1,9 +1,6 @@
 package com.loopers.interfaces.api.product;
 
-import com.loopers.application.product.ProductDetailInfo;
-import com.loopers.application.product.ProductFacade;
-import com.loopers.application.product.ProductGetListCommand;
-import com.loopers.application.product.ProductListInfo;
+import com.loopers.application.product.*;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -13,6 +10,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/products")
@@ -41,6 +40,38 @@ public class ProductV1Controller implements ProductV1ApiSpec {
         String normalizedUserId = (userId == null || userId.isBlank()) ? null : userId;
         ProductDetailInfo info = productFacade.getProductDetail(productId, normalizedUserId);
         return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
+    }
+
+    @PutMapping("/{productId}")
+    @Override
+    public ApiResponse<ProductV1Dto.ProductResponse> updateProduct(
+            @PathVariable Long productId,
+            @RequestBody ProductV1Dto.UpdateRequest request
+    ) {
+        ProductDetailInfo info = productFacade.updateProduct(productId, request.name(), request.price());
+        return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
+    }
+
+    @PostMapping("/{productId}/stock")
+    @Override
+    public ApiResponse<ProductV1Dto.StockResponse> increaseStock(
+            @PathVariable Long productId,
+            @RequestBody @Valid ProductV1Dto.StockRequest request
+    ) {
+        ProductDetailInfo info = productFacade.increaseStock(productId, request.quantity());
+        return ApiResponse.success(new ProductV1Dto.StockResponse(info.productId(), info.stock()));
+    }
+
+    @GetMapping("/popular")
+    @Override
+    public ApiResponse<ProductV1Dto.PopularProductsResponse> getPopularProducts(
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        if (limit <= 0 || limit > 100) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "limit은 1~100 이어야 합니다.");
+        }
+        List<PopularProductInfo> infos = productFacade.getPopularProducts(limit);
+        return ApiResponse.success(ProductV1Dto.PopularProductsResponse.from(infos));
     }
 
     @GetMapping
