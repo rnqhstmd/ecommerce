@@ -15,13 +15,14 @@ public class OrderV1Dto {
     public record PlaceOrderRequest(
             @NotEmpty(message = "주문 항목은 필수입니다.")
             @Valid
-            List<OrderItemRequest> items
+            List<OrderItemRequest> items,
+            Long couponId
     ) {
         public OrderPlaceCommand toCommand(String userId) {
             List<OrderPlaceCommand.OrderItemCommand> itemCommands = items.stream()
                     .map(item -> new OrderPlaceCommand.OrderItemCommand(item.productId(), item.quantity()))
                     .toList();
-            return new OrderPlaceCommand(userId, itemCommands);
+            return new OrderPlaceCommand(userId, itemCommands, couponId);
         }
     }
 

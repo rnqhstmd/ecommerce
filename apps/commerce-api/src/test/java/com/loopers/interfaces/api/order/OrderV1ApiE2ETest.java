@@ -73,7 +73,8 @@ class OrderV1ApiE2ETest {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-USER-ID", "orderuser");
         OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
-                List.of(new OrderV1Dto.OrderItemRequest(productId, 2))
+                List.of(new OrderV1Dto.OrderItemRequest(productId, 2)),
+                null
         );
 
         // act
@@ -104,7 +105,8 @@ class OrderV1ApiE2ETest {
     void placeOrder_returnsUnauthorized_whenNoUserId() {
         // arrange
         OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
-                List.of(new OrderV1Dto.OrderItemRequest(productId, 1))
+                List.of(new OrderV1Dto.OrderItemRequest(productId, 1)),
+                null
         );
 
         // act
@@ -170,7 +172,8 @@ class OrderV1ApiE2ETest {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-USER-ID", "orderuser");
         OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
-                List.of(new OrderV1Dto.OrderItemRequest(productId, 1))
+                List.of(new OrderV1Dto.OrderItemRequest(productId, 1)),
+                null
         );
         testRestTemplate.exchange(
                 "/api/v1/orders",
@@ -240,7 +243,8 @@ class OrderV1ApiE2ETest {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-USER-ID", "orderuser");
         OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
-                List.of(new OrderV1Dto.OrderItemRequest(productId, 2))
+                List.of(new OrderV1Dto.OrderItemRequest(productId, 2)),
+                null
         );
         ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> createResponse =
                 testRestTemplate.exchange(

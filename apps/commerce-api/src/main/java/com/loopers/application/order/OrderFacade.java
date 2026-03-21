@@ -1,5 +1,8 @@
 package com.loopers.application.order;
 
+import com.loopers.domain.coupon.CouponPolicy;
+import com.loopers.domain.coupon.CouponService;
+import com.loopers.domain.coupon.UserCoupon;
 import com.loopers.domain.order.*;
 import com.loopers.domain.point.PointService;
 import com.loopers.domain.product.Product;
@@ -31,6 +34,7 @@ public class OrderFacade {
     private final StockDeductionService stockDeductionService;
     private final PointService pointService;
     private final ProductService productService;
+    private final CouponService couponService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -51,7 +55,28 @@ public class OrderFacade {
         }
 
         Long totalAmount = order.getTotalAmountValue();
-        pointService.usePoint(command.userId(), totalAmount);
+
+        // 쿠폰 적용
+        long discountAmount = 0L;
+        UserCoupon userCoupon = null;
+        if (command.couponId() != null) {
+            userCoupon = couponService.getUserCouponByIdAndUserId(command.couponId(), command.userId());
+            if (userCoupon.isUsed()) {
+                throw new CoreException(ErrorType.BAD_REQUEST, "이미 사용된 쿠폰입니다.");
+            }
+            CouponPolicy policy = couponService.getCouponPolicy(userCoupon.getCouponPolicyId());
+            if (!policy.isValid()) {
+                throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰 유효기간이 아닙니다.");
+            }
+            discountAmount = policy.calculateDiscount(totalAmount);
+        }
+
+        long payAmount = totalAmount - discountAmount;
+        pointService.usePoint(command.userId(), payAmount);
+
+        if (userCoupon != null) {
+            couponService.markCouponUsed(userCoupon);
+        }
 
         order.completePayment();
 
