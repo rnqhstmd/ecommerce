@@ -48,4 +48,22 @@ public interface BrandV1ApiSpec {
             @Parameter(description = "브랜드 ID", required = true)
             @PathVariable Long id
     );
+
+    @Operation(summary = "브랜드 목록 조회", description = "브랜드 목록을 페이징하여 조회합니다.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = BrandV1Dto.BrandListResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400", description = "잘못된 요청",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            )
+    })
+    ApiResponse<BrandV1Dto.BrandListResponse> getBrands(
+            @Parameter(description = "페이지 번호 (0부터 시작)")
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "페이지 크기 (1~100)")
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "20") int size
+    );
 }

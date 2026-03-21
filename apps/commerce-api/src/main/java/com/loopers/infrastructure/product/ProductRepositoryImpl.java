@@ -57,4 +57,11 @@ public class ProductRepositoryImpl implements ProductRepository {
     public void decrementLikeCount(Long productId) {
         jpaRepository.decrementLikeCount(productId);
     }
+
+    @Override
+    public List<Product> findTopByLikeCountDesc(int limit) {
+        return jpaRepository.findTopByLikeCountDesc(
+                org.springframework.data.domain.PageRequest.of(0, limit)
+        );
+    }
 }

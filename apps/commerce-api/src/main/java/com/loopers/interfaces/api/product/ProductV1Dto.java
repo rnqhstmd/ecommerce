@@ -1,5 +1,6 @@
 package com.loopers.interfaces.api.product;
 
+import com.loopers.application.product.PopularProductInfo;
 import com.loopers.application.product.ProductDetailInfo;
 import com.loopers.application.product.ProductListInfo;
 import jakarta.validation.constraints.NotBlank;
@@ -61,6 +62,49 @@ public class ProductV1Dto {
                     .map(ProductContentResponse::from).toList();
             return new ProductListResponse(contents, info.page(), info.size(),
                     info.totalElements(), info.totalPages());
+        }
+    }
+
+    public record UpdateRequest(
+            String name,
+            Long price
+    ) {}
+
+    public record StockRequest(
+            @NotNull(message = "수량은 필수입니다.")
+            @Positive(message = "수량은 1 이상이어야 합니다.")
+            Integer quantity
+    ) {}
+
+    public record StockResponse(
+            Long productId,
+            Integer stock
+    ) {}
+
+    public record PopularProductsResponse(
+            List<PopularProductItem> products
+    ) {
+        public static PopularProductsResponse from(List<PopularProductInfo> infos) {
+            List<PopularProductItem> items = infos.stream()
+                    .map(PopularProductItem::from)
+                    .toList();
+            return new PopularProductsResponse(items);
+        }
+    }
+
+    public record PopularProductItem(
+            Long productId,
+            String productName,
+            Long price,
+            Long likeCount
+    ) {
+        public static PopularProductItem from(PopularProductInfo info) {
+            return new PopularProductItem(
+                    info.productId(),
+                    info.productName(),
+                    info.price(),
+                    info.likeCount()
+            );
         }
     }
 

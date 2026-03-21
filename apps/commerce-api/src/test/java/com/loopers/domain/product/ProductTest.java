@@ -179,4 +179,103 @@ class ProductTest {
                     .isEqualTo(ErrorType.BAD_REQUEST);
         }
     }
+
+    @Nested
+    @DisplayName("상품명 수정 (updateName)")
+    class UpdateName {
+
+        private Product product;
+
+        @BeforeEach
+        void setUp() {
+            product = Product.create("Original Name", 1000L, 10, 1L);
+        }
+
+        @DisplayName("유효한 이름으로 상품명을 변경할 수 있다.")
+        @Test
+        void updateName_success() {
+            // act
+            product.updateName("New Name");
+
+            // assert
+            assertThat(product.getName()).isEqualTo("New Name");
+        }
+
+        @DisplayName("이름이 null이면 변경하지 않는다.")
+        @Test
+        void updateName_doesNotChange_whenNull() {
+            // act
+            product.updateName(null);
+
+            // assert
+            assertThat(product.getName()).isEqualTo("Original Name");
+        }
+
+        @DisplayName("이름이 공백이면 변경하지 않는다.")
+        @ParameterizedTest
+        @ValueSource(strings = {"", "   "})
+        void updateName_doesNotChange_whenBlank(String blankName) {
+            // act
+            product.updateName(blankName);
+
+            // assert
+            assertThat(product.getName()).isEqualTo("Original Name");
+        }
+
+        @DisplayName("이름이 100자를 초과하면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void updateName_throwsException_whenNameTooLong() {
+            // arrange
+            String longName = "A".repeat(101);
+
+            // act & assert
+            assertThatThrownBy(() -> product.updateName(longName))
+                    .isInstanceOf(CoreException.class)
+                    .extracting(ex -> ((CoreException) ex).getErrorType())
+                    .isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
+
+    @Nested
+    @DisplayName("가격 수정 (updatePrice)")
+    class UpdatePrice {
+
+        private Product product;
+
+        @BeforeEach
+        void setUp() {
+            product = Product.create("Test Product", 1000L, 10, 1L);
+        }
+
+        @DisplayName("유효한 가격으로 변경할 수 있다.")
+        @Test
+        void updatePrice_success() {
+            // act
+            product.updatePrice(2000L);
+
+            // assert
+            assertThat(product.getPriceValue()).isEqualTo(2000L);
+        }
+
+        @DisplayName("가격이 null이면 변경하지 않는다.")
+        @Test
+        void updatePrice_doesNotChange_whenNull() {
+            // act
+            product.updatePrice(null);
+
+            // assert
+            assertThat(product.getPriceValue()).isEqualTo(1000L);
+        }
+
+        @DisplayName("가격이 0 이하이면 BAD_REQUEST 예외가 발생한다.")
+        @ParameterizedTest
+        @ValueSource(longs = {0L, -1L, -100L})
+        void updatePrice_throwsException_whenPriceIsInvalid(long invalidPrice) {
+            // act & assert
+            assertThatThrownBy(() -> product.updatePrice(invalidPrice))
+                    .isInstanceOf(CoreException.class)
+                    .extracting(ex -> ((CoreException) ex).getErrorType())
+                    .isEqualTo(ErrorType.BAD_REQUEST);
+        }
+    }
 }

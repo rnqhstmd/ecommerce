@@ -3,6 +3,8 @@ package com.loopers.domain.brand;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,5 +24,9 @@ public class BrandService {
     public Brand createBrand(String name) {
         Brand brand = Brand.create(name);
         return brandRepository.save(brand);
+    }
+
+    public Page<Brand> getBrands(Pageable pageable) {
+        return brandRepository.findAll(pageable);
     }
 }

@@ -12,13 +12,19 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Component
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ProductFacade {
 
+    private static final Logger log = LoggerFactory.getLogger(ProductFacade.class);
+
     private final ProductService productService;
     private final LikeService likeService;
+    private final PopularProductService popularProductService;
 
     @Transactional
     public ProductDetailInfo createProduct(String name, Long price, Integer stock, Long brandId) {
@@ -36,6 +42,38 @@ public class ProductFacade {
     // 하위 호환 오버로드
     public ProductDetailInfo getProductDetail(Long productId) {
         return getProductDetail(productId, null);
+    }
+
+    @Transactional
+    public ProductDetailInfo updateProduct(Long productId, String name, Long price) {
+        Product product = productService.getProductWithLock(productId);
+        String oldName = product.getName();
+        Long oldPrice = product.getPriceValue();
+
+        product.updateName(name);
+        product.updatePrice(price);
+
+        productService.evictProductCache(productId);
+
+        log.info("상품 수정: id={}, name: {} -> {}, price: {} -> {}",
+                productId, oldName, product.getName(), oldPrice, product.getPriceValue());
+
+        Long likeCount = likeService.getLikeCount(productId);
+        return ProductDetailInfo.of(product, likeCount);
+    }
+
+    @Transactional
+    public ProductDetailInfo increaseStock(Long productId, Integer quantity) {
+        Product product = productService.getProductWithLock(productId);
+        product.increaseStock(quantity);
+        productService.evictProductCache(productId);
+
+        Long likeCount = likeService.getLikeCount(productId);
+        return ProductDetailInfo.of(product, likeCount);
+    }
+
+    public List<PopularProductInfo> getPopularProducts(int limit) {
+        return popularProductService.getPopularProducts(limit);
     }
 
     public ProductListInfo getProducts(ProductGetListCommand command) {
