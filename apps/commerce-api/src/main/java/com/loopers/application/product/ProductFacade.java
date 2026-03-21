@@ -41,6 +41,9 @@ public class ProductFacade {
     public ProductListInfo getProducts(ProductGetListCommand command) {
         ProductSearchCondition condition = new ProductSearchCondition(
                 command.brandId(),
+                command.keyword(),
+                command.minPrice(),
+                command.maxPrice(),
                 command.pageable()
         );
 

@@ -1,5 +1,6 @@
 package com.loopers.infrastructure.order;
 
+import com.loopers.domain.order.OrderCancelledEvent;
 import com.loopers.domain.order.OrderPlacedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,16 +16,27 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @Slf4j
 public class OrderEventPublisher {
 
-    private static final String TOPIC = "order-placed";
+    private static final String TOPIC_ORDER_PLACED = "order-placed";
+    private static final String TOPIC_ORDER_CANCELLED = "order-cancelled";
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(OrderPlacedEvent event) {
         try {
-            kafkaTemplate.send(TOPIC, String.valueOf(event.orderId()), event);
+            kafkaTemplate.send(TOPIC_ORDER_PLACED, String.valueOf(event.orderId()), event);
         } catch (Exception e) {
             log.error("Failed to publish OrderPlacedEvent for orderId={}: {}", event.orderId(), e.getMessage(), e);
+        }
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleOrderCancelledEvent(OrderCancelledEvent event) {
+        try {
+            kafkaTemplate.send(TOPIC_ORDER_CANCELLED, String.valueOf(event.orderId()), event);
+            log.info("OrderCancelledEvent 발행 성공: orderId={}", event.orderId());
+        } catch (Exception e) {
+            log.error("OrderCancelledEvent Kafka 발행 실패: orderId={}", event.orderId(), e);
         }
     }
 }

@@ -33,6 +33,9 @@ public class Order extends BaseEntity {
     @Column(name = "paid_at")
     private ZonedDateTime paidAt;
 
+    @Column(name = "cancelled_at")
+    private ZonedDateTime cancelledAt;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> orderItems = new ArrayList<>();
 
@@ -66,6 +69,19 @@ public class Order extends BaseEntity {
         validateBeforePayment();
         this.status = OrderStatus.PAID;
         this.paidAt = ZonedDateTime.now();
+    }
+
+    public void cancel() {
+        if (this.status != OrderStatus.PAID) {
+            throw new CoreException(ErrorType.BAD_REQUEST,
+                "결제 완료 상태의 주문만 취소할 수 있습니다.");
+        }
+        this.status = OrderStatus.CANCELLED;
+        this.cancelledAt = ZonedDateTime.now();
+    }
+
+    public boolean isOwnedBy(String userId) {
+        return this.userId.equals(userId);
     }
 
     private void recalculateTotalAmount() {

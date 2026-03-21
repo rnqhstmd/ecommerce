@@ -1,8 +1,11 @@
 package com.loopers.interfaces.api.point;
 
 import com.loopers.application.point.PointCommand;
+import com.loopers.domain.point.PointHistory;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+
+import java.time.ZonedDateTime;
 
 public class PointV1Dto {
     public record ChargeRequest(
@@ -29,6 +32,24 @@ public class PointV1Dto {
             return new PointResponse(
                     userId,
                     amount
+            );
+        }
+    }
+
+    public record PointHistoryResponse(
+            Long historyId,
+            String type,
+            Long amount,
+            Long balanceAfter,
+            ZonedDateTime createdAt
+    ) {
+        public static PointHistoryResponse from(PointHistory history) {
+            return new PointHistoryResponse(
+                    history.getId(),
+                    history.getType().name(),
+                    history.getAmount(),
+                    history.getBalanceAfter(),
+                    history.getCreatedAt()
             );
         }
     }

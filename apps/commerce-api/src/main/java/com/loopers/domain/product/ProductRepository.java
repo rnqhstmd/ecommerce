@@ -12,7 +12,8 @@ public interface ProductRepository {
     Optional<Product> findById(Long id);
     List<Product> findAllByIds(Collection<Long> ids);
     List<Product> findAllByIdsWithLock(List<Long> ids);
-    Page<Product> findProducts(Pageable pageable, Long brandId);
+    Optional<Product> findByIdWithLock(Long id);
+    Page<Product> findProducts(ProductSearchCondition condition);
     void incrementLikeCount(Long productId);
     void decrementLikeCount(Long productId);
 }

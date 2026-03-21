@@ -1,17 +1,22 @@
 package com.loopers.application.order;
 
-import com.loopers.domain.order.Order;
-import com.loopers.domain.order.OrderPlacedEvent;
-import com.loopers.domain.order.OrderService;
+import com.loopers.domain.order.*;
 import com.loopers.domain.point.PointService;
 import com.loopers.domain.product.Product;
+import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.StockDeductionService;
 import com.loopers.domain.product.StockDeductionService.StockDeductionCommand;
+import com.loopers.interfaces.api.common.PageResponse;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -25,6 +30,7 @@ public class OrderFacade {
     private final OrderService orderService;
     private final StockDeductionService stockDeductionService;
     private final PointService pointService;
+    private final ProductService productService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -68,6 +74,53 @@ public class OrderFacade {
         eventPublisher.publishEvent(event);
 
         return OrderInfo.from(savedOrder);
+    }
+
+    @Transactional
+    public OrderInfo.CancelInfo cancelOrder(Long orderId, String userId) {
+        // 1. 비관적 락으로 주문 조회
+        Order order = orderService.getOrderByIdWithLock(orderId);
+
+        // 2. 소유자 검증 (소유자 불일치 시 NOT_FOUND)
+        if (!order.isOwnedBy(userId)) {
+            throw new CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다.");
+        }
+
+        // 3. 상태 변경 (PAID가 아니면 BAD_REQUEST)
+        order.cancel();
+
+        // 4. 재고 복구 (ID 오름차순 비관적 락)
+        restoreStock(order);
+
+        // 5. 포인트 환불 + PointHistory(REFUND) 저장
+        pointService.refundPoint(userId, order.getTotalAmountValue());
+
+        // 6. 이벤트 발행
+        eventPublisher.publishEvent(OrderCancelledEvent.from(order));
+
+        return OrderInfo.CancelInfo.from(order);
+    }
+
+    private void restoreStock(Order order) {
+        List<OrderItem> sortedItems = order.getOrderItems().stream()
+                .sorted(Comparator.comparing(OrderItem::getProductId))
+                .toList();
+
+        for (OrderItem item : sortedItems) {
+            Product product = productService.getProductWithLock(item.getProductId());
+            product.increaseStock(item.getQuantity());
+        }
+    }
+
+    public PageResponse<OrderInfo.OrderSummaryInfo> getMyOrdersPaged(String userId, OrderStatus status, Pageable pageable) {
+        OrderSearchCondition condition = new OrderSearchCondition(userId, status, pageable);
+        Page<Order> orderPage = orderService.getOrdersByCondition(condition);
+
+        List<OrderInfo.OrderSummaryInfo> content = orderPage.getContent().stream()
+                .map(OrderInfo.OrderSummaryInfo::from)
+                .toList();
+
+        return PageResponse.of(orderPage, content);
     }
 
     public List<OrderInfo> getMyOrders(String userId) {

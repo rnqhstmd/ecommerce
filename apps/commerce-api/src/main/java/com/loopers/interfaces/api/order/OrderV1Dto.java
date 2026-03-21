@@ -74,4 +74,36 @@ public class OrderV1Dto {
             );
         }
     }
+
+    public record CancelResponse(
+            Long orderId,
+            String status,
+            ZonedDateTime cancelledAt
+    ) {
+        public static CancelResponse from(OrderInfo.CancelInfo info) {
+            return new CancelResponse(
+                    info.orderId(),
+                    info.status(),
+                    info.cancelledAt()
+            );
+        }
+    }
+
+    public record OrderSummaryResponse(
+            Long orderId,
+            String status,
+            Long totalAmount,
+            ZonedDateTime paidAt,
+            Integer itemCount
+    ) {
+        public static OrderSummaryResponse from(OrderInfo.OrderSummaryInfo info) {
+            return new OrderSummaryResponse(
+                    info.orderId(),
+                    info.status().name(),
+                    info.totalAmount(),
+                    info.paidAt(),
+                    info.itemCount()
+            );
+        }
+    }
 }

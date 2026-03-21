@@ -3,6 +3,8 @@ package com.loopers.domain.point;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PointService {
 
     private final PointRepository pointRepository;
+    private final PointHistoryRepository pointHistoryRepository;
 
     @Transactional
     public Point createPoint(String userId) {
@@ -36,13 +39,36 @@ public class PointService {
     public Point chargePoint(String userId, Long amount) {
         Point point = getPointWithLock(userId);
         point.charge(amount);
-        return pointRepository.save(point);
+        pointRepository.save(point);
+        pointHistoryRepository.save(
+                PointHistory.create(point, PointHistoryType.CHARGE, amount, point.getBalanceValue())
+        );
+        return point;
     }
 
     @Transactional
-    public void usePoint(String userId, Long amount) {
+    public Point usePoint(String userId, Long amount) {
         Point point = getPointWithLock(userId);
         point.use(amount);
         pointRepository.save(point);
+        pointHistoryRepository.save(
+                PointHistory.create(point, PointHistoryType.USE, amount, point.getBalanceValue())
+        );
+        return point;
+    }
+
+    @Transactional
+    public Point refundPoint(String userId, Long amount) {
+        Point point = getPointWithLock(userId);
+        point.refund(amount);
+        pointRepository.save(point);
+        pointHistoryRepository.save(
+                PointHistory.create(point, PointHistoryType.REFUND, amount, point.getBalanceValue())
+        );
+        return point;
+    }
+
+    public Page<PointHistory> getPointHistory(Long pointId, Pageable pageable) {
+        return pointHistoryRepository.findByPointId(pointId, pageable);
     }
 }

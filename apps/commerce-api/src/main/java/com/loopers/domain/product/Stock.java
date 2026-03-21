@@ -46,6 +46,13 @@ public class Stock {
         return new Stock(this.value - quantity);
     }
 
+    public Stock increase(Integer quantity) {
+        if (quantity == null || quantity <= 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "증가 수량은 0보다 커야 합니다.");
+        }
+        return new Stock(this.value + quantity);
+    }
+
     public boolean isAvailable(Integer quantity) {
         if (quantity == null || quantity <= 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "요청 수량은 0보다 커야 합니다.");

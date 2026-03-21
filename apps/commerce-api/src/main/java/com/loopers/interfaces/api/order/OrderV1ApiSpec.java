@@ -1,9 +1,9 @@
 package com.loopers.interfaces.api.order;
 
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.common.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -11,8 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
-
-import java.util.List;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @Tag(name = "Order API", description = "주문 관리 API")
 public interface OrderV1ApiSpec {
@@ -42,12 +41,37 @@ public interface OrderV1ApiSpec {
             @RequestBody OrderV1Dto.PlaceOrderRequest request
     );
 
-    @Operation(summary = "내 주문 목록 조회", description = "로그인한 사용자의 주문 목록을 조회합니다.")
+    @Operation(summary = "주문 취소", description = "주문을 취소합니다. PAID 상태만 취소 가능합니다.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "주문 취소 성공",
+                    content = @Content(schema = @Schema(implementation = OrderV1Dto.CancelResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "취소 불가 상태",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404",
+                    description = "주문을 찾을 수 없음",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            )
+    })
+    ApiResponse<OrderV1Dto.CancelResponse> cancelOrder(
+            @Parameter(description = "주문 ID", required = true)
+            @PathVariable Long id,
+            @Parameter(description = "사용자 ID", required = true)
+            @RequestHeader(value = "X-USER-ID", required = false) String userId
+    );
+
+    @Operation(summary = "내 주문 목록 조회", description = "로그인한 사용자의 주문 목록을 페이지네이션으로 조회합니다.")
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200",
                     description = "조회 성공",
-                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = OrderV1Dto.OrderResponse.class)))
+                    content = @Content(schema = @Schema(implementation = PageResponse.class))
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401",
@@ -55,9 +79,15 @@ public interface OrderV1ApiSpec {
                     content = @Content(schema = @Schema(implementation = ApiResponse.class))
             )
     })
-    ApiResponse<List<OrderV1Dto.OrderResponse>> getMyOrders(
+    ApiResponse<PageResponse<OrderV1Dto.OrderSummaryResponse>> getOrders(
             @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader(value = "X-USER-ID", required = false) String userId
+            @RequestHeader(value = "X-USER-ID", required = false) String userId,
+            @Parameter(description = "주문 상태 필터 (PENDING, PAID, CANCELLED)")
+            @RequestParam(required = false) String status,
+            @Parameter(description = "페이지 번호 (0부터 시작)")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "페이지 크기 (1~100)")
+            @RequestParam(defaultValue = "20") int size
     );
 
     @Operation(summary = "주문 상세 조회", description = "주문 ID로 주문 상세 정보를 조회합니다.")

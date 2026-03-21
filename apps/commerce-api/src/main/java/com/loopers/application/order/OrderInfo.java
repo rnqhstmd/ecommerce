@@ -45,4 +45,36 @@ public record OrderInfo(
                         .toList()
         );
     }
+
+    public record OrderSummaryInfo(
+            Long orderId,
+            OrderStatus status,
+            Long totalAmount,
+            ZonedDateTime paidAt,
+            Integer itemCount
+    ) {
+        public static OrderSummaryInfo from(Order order) {
+            return new OrderSummaryInfo(
+                    order.getId(),
+                    order.getStatus(),
+                    order.getTotalAmountValue(),
+                    order.getPaidAt(),
+                    order.getOrderItems().size()
+            );
+        }
+    }
+
+    public record CancelInfo(
+            Long orderId,
+            String status,
+            ZonedDateTime cancelledAt
+    ) {
+        public static CancelInfo from(Order order) {
+            return new CancelInfo(
+                    order.getId(),
+                    order.getStatus().name(),
+                    order.getCancelledAt()
+            );
+        }
+    }
 }
