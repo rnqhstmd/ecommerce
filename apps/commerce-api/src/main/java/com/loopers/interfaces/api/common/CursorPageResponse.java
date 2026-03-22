@@ -23,6 +23,13 @@ public record CursorPageResponse<T>(
             Function<E, Long> idExtractor,
             Function<E, T> mapper
     ) {
+        if (entities == null || entities.isEmpty()) {
+            return new CursorPageResponse<>(List.of(), null, false);
+        }
+        if (size <= 0) {
+            throw new IllegalArgumentException("size must be greater than 0");
+        }
+
         boolean hasNext = entities.size() > size;
         List<E> content = hasNext ? entities.subList(0, size) : entities;
 

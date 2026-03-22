@@ -9,6 +9,6 @@ public record CouponLockProperties(
 ) {
     public CouponLockProperties {
         if (waitTimeSeconds <= 0) waitTimeSeconds = 3;
-        if (leaseTimeSeconds <= 0) leaseTimeSeconds = 5;
+        if (leaseTimeSeconds <= 0) leaseTimeSeconds = 60;
     }
 }

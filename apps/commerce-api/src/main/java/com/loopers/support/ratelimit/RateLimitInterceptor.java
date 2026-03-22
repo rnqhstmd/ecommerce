@@ -61,10 +61,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         if (userId != null && !userId.isBlank()) {
             return "user:" + userId;
         }
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return "ip:" + forwarded.split(",")[0].trim();
-        }
+        // IP 폴백: X-Forwarded-For는 클라이언트가 조작 가능하므로 remoteAddr만 사용
         return "ip:" + request.getRemoteAddr();
     }
 }

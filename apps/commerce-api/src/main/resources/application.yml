@@ -34,12 +34,12 @@ management:
         include: health,info
   endpoint:
     health:
-      show-details: always
+      show-details: when-authorized
 
 coupon:
   lock:
     wait-time-seconds: 3
-    lease-time-seconds: 5
+    lease-time-seconds: 60
 
 rate-limit:
   enabled: true

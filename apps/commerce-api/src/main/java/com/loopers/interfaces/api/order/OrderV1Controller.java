@@ -3,7 +3,6 @@ package com.loopers.interfaces.api.order;
 import com.loopers.application.order.OrderFacade;
 import com.loopers.application.order.OrderInfo;
 import com.loopers.application.order.OrderPlaceCommand;
-import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderStatus;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.common.CursorPageRequest;
@@ -70,17 +69,18 @@ public class OrderV1Controller implements OrderV1ApiSpec {
     }
 
     @GetMapping("/cursor")
+    @Override
     public ApiResponse<CursorPageResponse<OrderV1Dto.OrderSummaryResponse>> getOrdersWithCursor(
             @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @Valid @ModelAttribute CursorPageRequest cursorPageRequest
     ) {
         validateUserId(userId);
 
-        List<Order> orders = orderFacade.getMyOrdersWithCursor(userId, cursorPageRequest.cursor(), cursorPageRequest.size());
+        List<OrderInfo.OrderSummaryInfo> summaries = orderFacade.getMyOrdersWithCursor(userId, cursorPageRequest.cursor(), cursorPageRequest.size());
         CursorPageResponse<OrderV1Dto.OrderSummaryResponse> response = CursorPageResponse.of(
-                orders, cursorPageRequest.size(),
-                Order::getId,
-                order -> OrderV1Dto.OrderSummaryResponse.from(OrderInfo.OrderSummaryInfo.from(order))
+                summaries, cursorPageRequest.size(),
+                OrderInfo.OrderSummaryInfo::orderId,
+                OrderV1Dto.OrderSummaryResponse::from
         );
         return ApiResponse.success(response);
     }

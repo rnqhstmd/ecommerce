@@ -2,7 +2,6 @@ package com.loopers.interfaces.api.review;
 
 import com.loopers.application.review.ReviewFacade;
 import com.loopers.application.review.ReviewInfo;
-import com.loopers.domain.review.Review;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.common.CursorPageRequest;
 import com.loopers.interfaces.api.common.CursorPageResponse;
@@ -50,15 +49,16 @@ public class ReviewV1Controller implements ReviewV1ApiSpec {
     }
 
     @GetMapping("/products/{productId}/reviews/cursor")
+    @Override
     public ApiResponse<CursorPageResponse<ReviewV1Dto.ReviewResponse>> getProductReviewsWithCursor(
             @PathVariable Long productId,
             @Valid @ModelAttribute CursorPageRequest cursorPageRequest
     ) {
-        List<Review> reviews = reviewFacade.getProductReviewsWithCursor(productId, cursorPageRequest.cursor(), cursorPageRequest.size());
+        List<ReviewInfo> reviews = reviewFacade.getProductReviewsWithCursor(productId, cursorPageRequest.cursor(), cursorPageRequest.size());
         CursorPageResponse<ReviewV1Dto.ReviewResponse> response = CursorPageResponse.of(
                 reviews, cursorPageRequest.size(),
-                Review::getId,
-                review -> ReviewV1Dto.ReviewResponse.from(ReviewInfo.from(review))
+                ReviewInfo::reviewId,
+                ReviewV1Dto.ReviewResponse::from
         );
         return ApiResponse.success(response);
     }

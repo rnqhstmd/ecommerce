@@ -27,7 +27,7 @@ public class BrandService {
         return brandRepository.save(brand);
     }
 
-    @Cacheable(value = "brands", key = "#pageable.pageNumber + '-' + #pageable.pageSize")
+    @Cacheable(value = "brands", key = "#pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort")
     public Page<Brand> getBrands(Pageable pageable) {
         return brandRepository.findAll(pageable);
     }

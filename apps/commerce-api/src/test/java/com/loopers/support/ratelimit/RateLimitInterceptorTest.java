@@ -101,12 +101,12 @@ class RateLimitInterceptorTest {
         verify(redisTemplate).execute(any(RedisScript.class), eq(List.of("rate:limit:user:testuser")), eq("60"));
     }
 
-    @DisplayName("X-USER-ID가 없고 X-Forwarded-For가 있으면 IP 기반 키를 생성한다.")
+    @DisplayName("X-USER-ID가 없으면 remoteAddr 기반 IP 키를 생성한다.")
     @Test
-    void resolveIdentifier_withForwardedFor_generatesIpKey() {
+    void resolveIdentifier_withoutUserId_generatesIpKeyFromRemoteAddr() {
         // arrange
         given(request.getHeader("X-USER-ID")).willReturn(null);
-        given(request.getHeader("X-Forwarded-For")).willReturn("192.168.1.1, 10.0.0.1");
+        given(request.getRemoteAddr()).willReturn("192.168.1.1");
         given(redisTemplate.execute(any(RedisScript.class), eq(List.of("rate:limit:ip:192.168.1.1")), eq("60")))
                 .willReturn(1L);
 
@@ -115,22 +115,5 @@ class RateLimitInterceptorTest {
 
         // assert
         verify(redisTemplate).execute(any(RedisScript.class), eq(List.of("rate:limit:ip:192.168.1.1")), eq("60"));
-    }
-
-    @DisplayName("X-USER-ID와 X-Forwarded-For 모두 없으면 remoteAddr 기반 키를 생성한다.")
-    @Test
-    void resolveIdentifier_fallbackToRemoteAddr_generatesIpKey() {
-        // arrange
-        given(request.getHeader("X-USER-ID")).willReturn(null);
-        given(request.getHeader("X-Forwarded-For")).willReturn(null);
-        given(request.getRemoteAddr()).willReturn("127.0.0.1");
-        given(redisTemplate.execute(any(RedisScript.class), eq(List.of("rate:limit:ip:127.0.0.1")), eq("60")))
-                .willReturn(1L);
-
-        // act
-        interceptor.preHandle(request, response, new Object());
-
-        // assert
-        verify(redisTemplate).execute(any(RedisScript.class), eq(List.of("rate:limit:ip:127.0.0.1")), eq("60"));
     }
 }

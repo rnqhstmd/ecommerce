@@ -48,6 +48,10 @@ public class OrderRepositoryImpl implements OrderRepository {
 
     @Override
     public List<Order> findByUserIdWithCursor(String userId, Long cursor, int size) {
-        return jpaRepository.findByUserIdWithCursor(userId, cursor, PageRequest.of(0, size + 1));
+        List<Long> ids = jpaRepository.findOrderIdsByUserIdWithCursor(userId, cursor, PageRequest.of(0, size + 1));
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return jpaRepository.findAllByIdInWithOrderItems(ids);
     }
 }
