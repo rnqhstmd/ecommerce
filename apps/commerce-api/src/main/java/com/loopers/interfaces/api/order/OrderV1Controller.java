@@ -3,8 +3,10 @@ package com.loopers.interfaces.api.order;
 import com.loopers.application.order.OrderFacade;
 import com.loopers.application.order.OrderInfo;
 import com.loopers.application.order.OrderPlaceCommand;
+import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderStatus;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.common.CursorPageResponse;
 import com.loopers.interfaces.api.common.PageResponse;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -12,6 +14,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -62,6 +66,26 @@ public class OrderV1Controller implements OrderV1ApiSpec {
                 orderFacade.getMyOrdersPaged(userId, orderStatus, PageRequest.of(page, size));
 
         return ApiResponse.success(pageResponse.map(OrderV1Dto.OrderSummaryResponse::from));
+    }
+
+    @GetMapping("/cursor")
+    public ApiResponse<CursorPageResponse<OrderV1Dto.OrderSummaryResponse>> getOrdersWithCursor(
+            @RequestHeader(value = "X-USER-ID", required = false) String userId,
+            @RequestParam(required = false) Long cursor,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        validateUserId(userId);
+        if (size < 1 || size > 100) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "size는 1 이상 100 이하여야 합니다.");
+        }
+
+        List<Order> orders = orderFacade.getMyOrdersWithCursor(userId, cursor, size);
+        CursorPageResponse<OrderV1Dto.OrderSummaryResponse> response = CursorPageResponse.of(
+                orders, size,
+                Order::getId,
+                order -> OrderV1Dto.OrderSummaryResponse.from(OrderInfo.OrderSummaryInfo.from(order))
+        );
+        return ApiResponse.success(response);
     }
 
     @GetMapping("/{id}")

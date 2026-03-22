@@ -2,6 +2,7 @@ package com.loopers.infrastructure.order;
 
 import com.loopers.domain.order.OrderCancelledEvent;
 import com.loopers.domain.order.OrderPlacedEvent;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -22,15 +23,18 @@ public class OrderEventPublisher {
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @CircuitBreaker(name = "kafkaPublisher", fallbackMethod = "handleOrderPlacedFallback")
     public void handle(OrderPlacedEvent event) {
         try {
             kafkaTemplate.send(TOPIC_ORDER_PLACED, String.valueOf(event.orderId()), event);
+            log.info("OrderPlacedEvent 발행 성공: orderId={}", event.orderId());
         } catch (Exception e) {
             log.error("Failed to publish OrderPlacedEvent for orderId={}: {}", event.orderId(), e.getMessage(), e);
         }
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @CircuitBreaker(name = "kafkaPublisher", fallbackMethod = "handleOrderCancelledFallback")
     public void handleOrderCancelledEvent(OrderCancelledEvent event) {
         try {
             kafkaTemplate.send(TOPIC_ORDER_CANCELLED, String.valueOf(event.orderId()), event);
@@ -38,5 +42,15 @@ public class OrderEventPublisher {
         } catch (Exception e) {
             log.error("OrderCancelledEvent Kafka 발행 실패: orderId={}", event.orderId(), e);
         }
+    }
+
+    private void handleOrderPlacedFallback(OrderPlacedEvent event, Throwable t) {
+        log.error("OrderPlacedEvent Kafka 발행 실패 (CircuitBreaker fallback): orderId={}, error={}",
+                event.orderId(), t.getMessage(), t);
+    }
+
+    private void handleOrderCancelledFallback(OrderCancelledEvent event, Throwable t) {
+        log.error("OrderCancelledEvent Kafka 발행 실패 (CircuitBreaker fallback): orderId={}, error={}",
+                event.orderId(), t.getMessage(), t);
     }
 }

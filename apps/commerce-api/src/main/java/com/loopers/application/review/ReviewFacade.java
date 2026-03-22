@@ -59,6 +59,10 @@ public class ReviewFacade {
         return new ProductReviewInfo(roundedAverage, totalCount, pageResponse);
     }
 
+    public List<Review> getProductReviewsWithCursor(Long productId, Long cursor, int size) {
+        return reviewService.getReviewsByProductIdWithCursor(productId, cursor, size);
+    }
+
     public record ProductReviewInfo(
             double averageRating,
             long totalCount,

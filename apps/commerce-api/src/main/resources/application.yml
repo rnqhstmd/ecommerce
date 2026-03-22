@@ -17,6 +17,8 @@ spring:
     name: commerce-api
   profiles:
     active: local
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   config:
     import:
       - jpa.yml
@@ -24,6 +26,35 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+rate-limit:
+  enabled: true
+  max-requests: 60
+  window-seconds: 60
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      kafkaPublisher:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        register-health-indicator: true
+  retry:
+    instances:
+      redisRetry:
+        max-attempts: 3
+        wait-duration: 500ms
 
 springdoc:
   use-fqn: true
@@ -35,6 +66,9 @@ spring:
   config:
     activate:
       on-profile: local, test
+
+rate-limit:
+  enabled: false
 
 ---
 spring:

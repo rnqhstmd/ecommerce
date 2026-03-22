@@ -3,6 +3,7 @@ package com.loopers.domain.brand;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,7 @@ public class BrandService {
         return brandRepository.save(brand);
     }
 
+    @Cacheable(value = "brands", key = "#pageable.pageNumber + '-' + #pageable.pageSize")
     public Page<Brand> getBrands(Pageable pageable) {
         return brandRepository.findAll(pageable);
     }

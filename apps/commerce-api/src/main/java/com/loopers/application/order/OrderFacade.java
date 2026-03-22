@@ -181,4 +181,8 @@ public class OrderFacade {
 
         return OrderInfo.from(order);
     }
+
+    public List<Order> getMyOrdersWithCursor(String userId, Long cursor, int size) {
+        return orderService.getOrdersByUserIdWithCursor(userId, cursor, size);
+    }
 }

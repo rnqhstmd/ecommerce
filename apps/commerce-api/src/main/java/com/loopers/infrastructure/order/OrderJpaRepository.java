@@ -35,4 +35,13 @@ public interface OrderJpaRepository extends JpaRepository<Order, Long> {
             @Param("status") OrderStatus status,
             Pageable pageable
     );
+
+    @Query("SELECT o FROM Order o WHERE o.userId = :userId " +
+            "AND (:cursor IS NULL OR o.id < :cursor) " +
+            "ORDER BY o.id DESC")
+    List<Order> findByUserIdWithCursor(
+            @Param("userId") String userId,
+            @Param("cursor") Long cursor,
+            Pageable pageable
+    );
 }
