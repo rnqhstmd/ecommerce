@@ -6,6 +6,7 @@ import com.loopers.application.order.OrderPlaceCommand;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderStatus;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.common.CursorPageRequest;
 import com.loopers.interfaces.api.common.CursorPageResponse;
 import com.loopers.interfaces.api.common.PageResponse;
 import com.loopers.support.error.CoreException;
@@ -71,17 +72,13 @@ public class OrderV1Controller implements OrderV1ApiSpec {
     @GetMapping("/cursor")
     public ApiResponse<CursorPageResponse<OrderV1Dto.OrderSummaryResponse>> getOrdersWithCursor(
             @RequestHeader(value = "X-USER-ID", required = false) String userId,
-            @RequestParam(required = false) Long cursor,
-            @RequestParam(defaultValue = "20") int size
+            @Valid @ModelAttribute CursorPageRequest cursorPageRequest
     ) {
         validateUserId(userId);
-        if (size < 1 || size > 100) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "size는 1 이상 100 이하여야 합니다.");
-        }
 
-        List<Order> orders = orderFacade.getMyOrdersWithCursor(userId, cursor, size);
+        List<Order> orders = orderFacade.getMyOrdersWithCursor(userId, cursorPageRequest.cursor(), cursorPageRequest.size());
         CursorPageResponse<OrderV1Dto.OrderSummaryResponse> response = CursorPageResponse.of(
-                orders, size,
+                orders, cursorPageRequest.size(),
                 Order::getId,
                 order -> OrderV1Dto.OrderSummaryResponse.from(OrderInfo.OrderSummaryInfo.from(order))
         );

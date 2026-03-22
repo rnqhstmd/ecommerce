@@ -59,9 +59,9 @@ class OrderEventPublisherTest {
         assertThat(captured.items().get(0).productName()).isEqualTo("Test Product");
     }
 
-    @DisplayName("Kafka 발행 실패 시 예외를 던지지 않고 로그만 남긴다.")
+    @DisplayName("Kafka 발행 실패 시 예외가 전파되어 CircuitBreaker가 감지할 수 있다.")
     @Test
-    void publishFailureShouldNotThrow() {
+    void publishFailureShouldThrowForCircuitBreaker() {
         // arrange
         when(kafkaTemplate.send(any(), any(), any()))
                 .thenThrow(new RuntimeException("Kafka broker unavailable"));
@@ -74,10 +74,10 @@ class OrderEventPublisherTest {
                 List.of(new OrderPlacedEvent.OrderItemSnapshot(200L, "Another Product", 1, 5000L))
         );
 
-        // act — should not throw
-        orderEventPublisher.handle(event);
+        // act & assert — should throw so CircuitBreaker can detect the failure
+        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
+                () -> orderEventPublisher.handle(event));
 
-        // assert
         verify(kafkaTemplate, times(1)).send(eq("order-placed"), eq("2"), any());
     }
 }

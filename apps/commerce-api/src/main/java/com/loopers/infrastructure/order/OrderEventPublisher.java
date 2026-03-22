@@ -25,23 +25,15 @@ public class OrderEventPublisher {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @CircuitBreaker(name = "kafkaPublisher", fallbackMethod = "handleOrderPlacedFallback")
     public void handle(OrderPlacedEvent event) {
-        try {
-            kafkaTemplate.send(TOPIC_ORDER_PLACED, String.valueOf(event.orderId()), event);
-            log.info("OrderPlacedEvent 발행 성공: orderId={}", event.orderId());
-        } catch (Exception e) {
-            log.error("Failed to publish OrderPlacedEvent for orderId={}: {}", event.orderId(), e.getMessage(), e);
-        }
+        kafkaTemplate.send(TOPIC_ORDER_PLACED, String.valueOf(event.orderId()), event);
+        log.info("OrderPlacedEvent 발행 성공: orderId={}", event.orderId());
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @CircuitBreaker(name = "kafkaPublisher", fallbackMethod = "handleOrderCancelledFallback")
     public void handleOrderCancelledEvent(OrderCancelledEvent event) {
-        try {
-            kafkaTemplate.send(TOPIC_ORDER_CANCELLED, String.valueOf(event.orderId()), event);
-            log.info("OrderCancelledEvent 발행 성공: orderId={}", event.orderId());
-        } catch (Exception e) {
-            log.error("OrderCancelledEvent Kafka 발행 실패: orderId={}", event.orderId(), e);
-        }
+        kafkaTemplate.send(TOPIC_ORDER_CANCELLED, String.valueOf(event.orderId()), event);
+        log.info("OrderCancelledEvent 발행 성공: orderId={}", event.orderId());
     }
 
     private void handleOrderPlacedFallback(OrderPlacedEvent event, Throwable t) {

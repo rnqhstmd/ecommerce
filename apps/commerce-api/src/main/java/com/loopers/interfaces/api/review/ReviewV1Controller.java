@@ -4,6 +4,7 @@ import com.loopers.application.review.ReviewFacade;
 import com.loopers.application.review.ReviewInfo;
 import com.loopers.domain.review.Review;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.common.CursorPageRequest;
 import com.loopers.interfaces.api.common.CursorPageResponse;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -51,16 +52,11 @@ public class ReviewV1Controller implements ReviewV1ApiSpec {
     @GetMapping("/products/{productId}/reviews/cursor")
     public ApiResponse<CursorPageResponse<ReviewV1Dto.ReviewResponse>> getProductReviewsWithCursor(
             @PathVariable Long productId,
-            @RequestParam(required = false) Long cursor,
-            @RequestParam(defaultValue = "20") int size
+            @Valid @ModelAttribute CursorPageRequest cursorPageRequest
     ) {
-        if (size < 1 || size > 100) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "size는 1 이상 100 이하여야 합니다.");
-        }
-
-        List<Review> reviews = reviewFacade.getProductReviewsWithCursor(productId, cursor, size);
+        List<Review> reviews = reviewFacade.getProductReviewsWithCursor(productId, cursorPageRequest.cursor(), cursorPageRequest.size());
         CursorPageResponse<ReviewV1Dto.ReviewResponse> response = CursorPageResponse.of(
-                reviews, size,
+                reviews, cursorPageRequest.size(),
                 Review::getId,
                 review -> ReviewV1Dto.ReviewResponse.from(ReviewInfo.from(review))
         );

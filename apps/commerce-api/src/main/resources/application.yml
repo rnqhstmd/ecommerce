@@ -36,6 +36,11 @@ management:
     health:
       show-details: always
 
+coupon:
+  lock:
+    wait-time-seconds: 3
+    lease-time-seconds: 5
+
 rate-limit:
   enabled: true
   max-requests: 60

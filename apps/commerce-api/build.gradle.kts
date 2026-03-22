@@ -13,10 +13,10 @@ dependencies {
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${project.properties["springDocOpenApiVersion"]}")
 
     // redisson (distributed lock)
-    implementation("org.redisson:redisson-spring-boot-starter:3.27.0")
+    implementation("org.redisson:redisson-spring-boot-starter:${project.properties["redissonVersion"]}")
 
     // resilience4j
-    implementation("io.github.resilience4j:resilience4j-spring-boot3:2.2.0")
+    implementation("io.github.resilience4j:resilience4j-spring-boot3:${project.properties["resilience4jVersion"]}")
     implementation("org.springframework.boot:spring-boot-starter-aop")
 
     // querydsl

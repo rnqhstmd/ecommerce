@@ -24,10 +24,15 @@ public class CouponFacade {
     private final RedisTemplate<String, String> redisTemplate;
     private final DistributedLockService distributedLockService;
     private final TransactionTemplate transactionTemplate;
+    private final CouponLockProperties couponLockProperties;
 
     public CouponInfo issueCoupon(Long couponPolicyId, String userId) {
         String lockKey = COUPON_LOCK_KEY_PREFIX + couponPolicyId;
-        return distributedLockService.executeWithLock(lockKey, 3, 5, TimeUnit.SECONDS,
+        return distributedLockService.executeWithLock(
+                lockKey,
+                couponLockProperties.waitTimeSeconds(),
+                couponLockProperties.leaseTimeSeconds(),
+                TimeUnit.SECONDS,
                 () -> doIssueCoupon(couponPolicyId, userId));
     }
 

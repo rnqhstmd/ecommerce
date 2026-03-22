@@ -66,15 +66,17 @@ public class PopularProductService {
         redisTemplate.opsForZSet().add(POPULAR_KEY, tuples);
         redisTemplate.expire(POPULAR_KEY, CACHE_TTL_HOURS, TimeUnit.HOURS);
 
-        return topProducts.stream()
-                .map(p -> PopularProductInfo.of(p, p.getLikeCount()))
-                .toList();
+        return toPopularProductInfos(topProducts);
     }
 
     private List<PopularProductInfo> getPopularProductsFallback(int limit, Throwable t) {
         log.warn("인기 상품 조회 Redis 장애 발생, DB 직접 조회로 폴백: {}", t.getMessage());
         List<Product> topProducts = productService.findTopByLikeCountDesc(limit);
-        return topProducts.stream()
+        return toPopularProductInfos(topProducts);
+    }
+
+    private List<PopularProductInfo> toPopularProductInfos(List<Product> products) {
+        return products.stream()
                 .map(p -> PopularProductInfo.of(p, p.getLikeCount()))
                 .toList();
     }
