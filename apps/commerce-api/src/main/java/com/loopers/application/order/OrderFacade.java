@@ -181,4 +181,12 @@ public class OrderFacade {
 
         return OrderInfo.from(order);
     }
+
+    @Transactional(readOnly = true)
+    public List<OrderInfo.OrderSummaryInfo> getMyOrdersWithCursor(String userId, Long cursor, int size) {
+        List<Order> orders = orderService.getOrdersByUserIdWithCursor(userId, cursor, size);
+        return orders.stream()
+                .map(OrderInfo.OrderSummaryInfo::from)
+                .toList();
+    }
 }

@@ -200,6 +200,59 @@ class OrderV1ApiE2ETest {
         );
     }
 
+    @DisplayName("GET /api/v1/orders/cursor - cursor 기반 주문 조회에 성공한다.")
+    @Test
+    void getOrdersWithCursor_success() {
+        // arrange - 주문 2건 생성
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-USER-ID", "orderuser");
+        for (int i = 0; i < 2; i++) {
+            OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
+                    List.of(new OrderV1Dto.OrderItemRequest(productId, 1)),
+                    null
+            );
+            testRestTemplate.exchange(
+                    "/api/v1/orders",
+                    HttpMethod.POST,
+                    new HttpEntity<>(request, headers),
+                    new ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>>() {}
+            );
+        }
+
+        // act
+        ResponseEntity<String> response =
+                testRestTemplate.exchange(
+                        "/api/v1/orders/cursor?size=10",
+                        HttpMethod.GET,
+                        new HttpEntity<>(headers),
+                        String.class
+                );
+
+        // assert
+        assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody()).isNotNull(),
+                () -> assertThat(response.getBody()).contains("\"content\""),
+                () -> assertThat(response.getBody()).contains("\"hasNext\"")
+        );
+    }
+
+    @DisplayName("GET /api/v1/orders/cursor - X-USER-ID 없으면 401을 반환한다.")
+    @Test
+    void getOrdersWithCursor_returnsUnauthorized_whenNoUserId() {
+        // act
+        ResponseEntity<String> response =
+                testRestTemplate.exchange(
+                        "/api/v1/orders/cursor?size=10",
+                        HttpMethod.GET,
+                        null,
+                        String.class
+                );
+
+        // assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
     @DisplayName("GET /api/v1/orders/{id} - X-USER-ID 없으면 401을 반환한다.")
     @Test
     void getOrderDetail_returnsUnauthorized_whenNoUserId() {

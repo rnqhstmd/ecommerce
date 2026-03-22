@@ -1,12 +1,15 @@
 package com.loopers.interfaces.api.review;
 
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.common.CursorPageRequest;
+import com.loopers.interfaces.api.common.CursorPageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -60,5 +63,25 @@ public interface ReviewV1ApiSpec {
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지 크기 (1~100)")
             @RequestParam(defaultValue = "20") int size
+    );
+
+    @Operation(summary = "상품 리뷰 커서 조회", description = "상품의 리뷰 목록을 커서 기반 페이지네이션으로 조회합니다.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = CursorPageResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "잘못된 요청",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            )
+    })
+    ApiResponse<CursorPageResponse<ReviewV1Dto.ReviewResponse>> getProductReviewsWithCursor(
+            @Parameter(description = "상품 ID", required = true)
+            @PathVariable Long productId,
+            @Parameter(description = "커서 페이지 요청 정보")
+            @ModelAttribute CursorPageRequest cursorPageRequest
     );
 }

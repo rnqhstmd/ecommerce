@@ -38,4 +38,8 @@ public class OrderService {
     public Page<Order> getOrdersByCondition(OrderSearchCondition condition) {
         return orderRepository.findByUserIdAndCondition(condition);
     }
+
+    public List<Order> getOrdersByUserIdWithCursor(String userId, Long cursor, int size) {
+        return orderRepository.findByUserIdWithCursor(userId, cursor, size);
+    }
 }

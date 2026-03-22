@@ -3,12 +3,16 @@ package com.loopers.interfaces.api.review;
 import com.loopers.application.review.ReviewFacade;
 import com.loopers.application.review.ReviewInfo;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.common.CursorPageRequest;
+import com.loopers.interfaces.api.common.CursorPageResponse;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -42,6 +46,21 @@ public class ReviewV1Controller implements ReviewV1ApiSpec {
         }
         ReviewFacade.ProductReviewInfo info = reviewFacade.getProductReviews(productId, PageRequest.of(page, size));
         return ApiResponse.success(ReviewV1Dto.ProductReviewResponse.from(info));
+    }
+
+    @GetMapping("/products/{productId}/reviews/cursor")
+    @Override
+    public ApiResponse<CursorPageResponse<ReviewV1Dto.ReviewResponse>> getProductReviewsWithCursor(
+            @PathVariable Long productId,
+            @Valid @ModelAttribute CursorPageRequest cursorPageRequest
+    ) {
+        List<ReviewInfo> reviews = reviewFacade.getProductReviewsWithCursor(productId, cursorPageRequest.cursor(), cursorPageRequest.size());
+        CursorPageResponse<ReviewV1Dto.ReviewResponse> response = CursorPageResponse.of(
+                reviews, cursorPageRequest.size(),
+                ReviewInfo::reviewId,
+                ReviewV1Dto.ReviewResponse::from
+        );
+        return ApiResponse.success(response);
     }
 
     private void validateUserId(String userId) {
