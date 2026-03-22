@@ -36,7 +36,7 @@ public interface OrderJpaRepository extends JpaRepository<Order, Long> {
             Pageable pageable
     );
 
-    @Query("SELECT o FROM Order o WHERE o.userId = :userId " +
+    @Query("SELECT o FROM Order o JOIN FETCH o.orderItems WHERE o.userId = :userId " +
             "AND (:cursor IS NULL OR o.id < :cursor) " +
             "ORDER BY o.id DESC")
     List<Order> findByUserIdWithCursor(
