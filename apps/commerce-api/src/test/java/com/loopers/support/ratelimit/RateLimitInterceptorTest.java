@@ -4,6 +4,7 @@ import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 
@@ -42,6 +46,11 @@ class RateLimitInterceptorTest {
         interceptor = new RateLimitInterceptor(redisTemplate, properties);
     }
 
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
+
     @DisplayName("rate limit이 비활성화되면 요청을 허용한다.")
     @Test
     void preHandle_disabled_allowsRequest() {
@@ -60,8 +69,8 @@ class RateLimitInterceptorTest {
     @DisplayName("요청 횟수가 제한 이내이면 허용한다.")
     @Test
     void preHandle_withinLimit_allowsRequest() {
-        // arrange
-        given(request.getHeader("X-USER-ID")).willReturn("user1");
+        // arrange - SecurityContext에 인증 정보 설정
+        setSecurityContext("user1");
         given(redisTemplate.execute(any(RedisScript.class), eq(List.of("rate:limit:user:user1")), eq("60")))
                 .willReturn(1L);
 
@@ -76,7 +85,7 @@ class RateLimitInterceptorTest {
     @Test
     void preHandle_exceedsLimit_throwsTooManyRequests() {
         // arrange
-        given(request.getHeader("X-USER-ID")).willReturn("user1");
+        setSecurityContext("user1");
         given(redisTemplate.execute(any(RedisScript.class), eq(List.of("rate:limit:user:user1")), eq("60")))
                 .willReturn(61L);
 
@@ -86,11 +95,11 @@ class RateLimitInterceptorTest {
                 .satisfies(ex -> assertThat(((CoreException) ex).getErrorType()).isEqualTo(ErrorType.TOO_MANY_REQUESTS));
     }
 
-    @DisplayName("X-USER-ID가 있으면 user 기반 키를 생성한다.")
+    @DisplayName("인증된 사용자가 있으면 user 기반 키를 생성한다.")
     @Test
-    void resolveIdentifier_withUserId_generatesUserKey() {
+    void resolveIdentifier_withAuthentication_generatesUserKey() {
         // arrange
-        given(request.getHeader("X-USER-ID")).willReturn("testuser");
+        setSecurityContext("testuser");
         given(redisTemplate.execute(any(RedisScript.class), eq(List.of("rate:limit:user:testuser")), eq("60")))
                 .willReturn(1L);
 
@@ -101,11 +110,10 @@ class RateLimitInterceptorTest {
         verify(redisTemplate).execute(any(RedisScript.class), eq(List.of("rate:limit:user:testuser")), eq("60"));
     }
 
-    @DisplayName("X-USER-ID가 없으면 remoteAddr 기반 IP 키를 생성한다.")
+    @DisplayName("인증 정보가 없으면 remoteAddr 기반 IP 키를 생성한다.")
     @Test
-    void resolveIdentifier_withoutUserId_generatesIpKeyFromRemoteAddr() {
-        // arrange
-        given(request.getHeader("X-USER-ID")).willReturn(null);
+    void resolveIdentifier_withoutAuthentication_generatesIpKeyFromRemoteAddr() {
+        // arrange - SecurityContext 비어있음
         given(request.getRemoteAddr()).willReturn("192.168.1.1");
         given(redisTemplate.execute(any(RedisScript.class), eq(List.of("rate:limit:ip:192.168.1.1")), eq("60")))
                 .willReturn(1L);
@@ -115,5 +123,14 @@ class RateLimitInterceptorTest {
 
         // assert
         verify(redisTemplate).execute(any(RedisScript.class), eq(List.of("rate:limit:ip:192.168.1.1")), eq("60"));
+    }
+
+    private void setSecurityContext(String userId) {
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(
+                        userId, null,
+                        List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                );
+        SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 }

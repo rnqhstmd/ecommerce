@@ -13,7 +13,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 
 @Tag(name = "Order API", description = "주문 관리 API")
@@ -38,8 +37,6 @@ public interface OrderV1ApiSpec {
             )
     })
     ApiResponse<OrderV1Dto.OrderResponse> placeOrder(
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @Parameter(description = "주문 요청 정보", required = true)
             @RequestBody OrderV1Dto.PlaceOrderRequest request
     );
@@ -69,9 +66,7 @@ public interface OrderV1ApiSpec {
     })
     ApiResponse<OrderV1Dto.CancelResponse> cancelOrder(
             @Parameter(description = "주문 ID", required = true)
-            @PathVariable Long id,
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader(value = "X-USER-ID", required = false) String userId
+            @PathVariable Long id
     );
 
     @Operation(summary = "내 주문 목록 조회", description = "로그인한 사용자의 주문 목록을 페이지네이션으로 조회합니다.")
@@ -93,8 +88,6 @@ public interface OrderV1ApiSpec {
             )
     })
     ApiResponse<PageResponse<OrderV1Dto.OrderSummaryResponse>> getOrders(
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @Parameter(description = "주문 상태 필터 (PENDING, PAID, CANCELLED)")
             @RequestParam(required = false) String status,
             @Parameter(description = "페이지 번호 (0부터 시작)")
@@ -122,8 +115,6 @@ public interface OrderV1ApiSpec {
             )
     })
     ApiResponse<OrderV1Dto.OrderResponse> getOrderDetail(
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @Parameter(description = "주문 ID", required = true)
             @PathVariable Long id
     );
@@ -147,8 +138,6 @@ public interface OrderV1ApiSpec {
             )
     })
     ApiResponse<CursorPageResponse<OrderV1Dto.OrderSummaryResponse>> getOrdersWithCursor(
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @Parameter(description = "커서 페이지 요청 정보")
             @ModelAttribute CursorPageRequest cursorPageRequest
     );

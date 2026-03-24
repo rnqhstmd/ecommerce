@@ -6,9 +6,8 @@ import com.loopers.domain.cart.CartService;
 import com.loopers.domain.point.PointService;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
-import com.loopers.domain.user.Gender;
 import com.loopers.interfaces.api.ApiResponse;
-import com.loopers.interfaces.api.user.UserV1Dto;
+import com.loopers.support.TestAuthHelper;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,14 +49,12 @@ class CartV1ApiE2ETest {
 
     private static final String USER_ID = "cartuser";
     private Long productId;
+    private String accessToken;
 
     @BeforeEach
     void setUp() {
-        // 사용자 생성
-        UserV1Dto.RegisterRequest registerRequest = new UserV1Dto.RegisterRequest(
-                USER_ID, "cart@example.com", "1990-01-01", Gender.MALE
-        );
-        testRestTemplate.postForEntity("/api/v1/users", registerRequest, ApiResponse.class);
+        // 사용자 생성 (auth API로)
+        accessToken = TestAuthHelper.signupAndGetToken(testRestTemplate, USER_ID, "cart@example.com", "password123");
 
         // 포인트 충전
         pointService.chargePoint(USER_ID, 1000000L);
@@ -81,9 +78,7 @@ class CartV1ApiE2ETest {
     @Test
     void addItem_success() {
         // arrange
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-USER-ID", USER_ID);
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpHeaders headers = TestAuthHelper.authJsonHeaders(accessToken);
         CartV1Dto.AddItemRequest request = new CartV1Dto.AddItemRequest(productId, 2);
 
         // act
@@ -105,9 +100,9 @@ class CartV1ApiE2ETest {
         );
     }
 
-    @DisplayName("POST /api/v1/cart/items - X-USER-ID 없으면 401을 반환한다.")
+    @DisplayName("POST /api/v1/cart/items - 토큰 없으면 401을 반환한다.")
     @Test
-    void addItem_returnsUnauthorized_whenNoUserId() {
+    void addItem_returnsUnauthorized_whenNoToken() {
         // arrange
         CartV1Dto.AddItemRequest request = new CartV1Dto.AddItemRequest(productId, 1);
 
@@ -130,8 +125,7 @@ class CartV1ApiE2ETest {
         // arrange - 장바구니에 상품 추가
         cartService.addItem(USER_ID, productId, 3);
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-USER-ID", USER_ID);
+        HttpHeaders headers = TestAuthHelper.authHeaders(accessToken);
 
         // act
         ResponseEntity<String> response =
@@ -158,8 +152,7 @@ class CartV1ApiE2ETest {
     @Test
     void getCart_returnsEmptyList_whenCartIsEmpty() {
         // arrange
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-USER-ID", USER_ID);
+        HttpHeaders headers = TestAuthHelper.authHeaders(accessToken);
 
         // act
         ResponseEntity<String> response =
@@ -184,8 +177,7 @@ class CartV1ApiE2ETest {
         // arrange - 장바구니에 상품 추가
         cartService.addItem(USER_ID, productId, 2);
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-USER-ID", USER_ID);
+        HttpHeaders headers = TestAuthHelper.authHeaders(accessToken);
 
         // act
         ResponseEntity<ApiResponse<Void>> response =
@@ -210,8 +202,7 @@ class CartV1ApiE2ETest {
         // arrange - 장바구니에 상품 추가
         cartService.addItem(USER_ID, productId, 2);
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-USER-ID", USER_ID);
+        HttpHeaders headers = TestAuthHelper.authHeaders(accessToken);
 
         // act
         ResponseEntity<String> response =
@@ -240,8 +231,7 @@ class CartV1ApiE2ETest {
     @Test
     void checkout_returnsBadRequest_whenCartIsEmpty() {
         // arrange
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-USER-ID", USER_ID);
+        HttpHeaders headers = TestAuthHelper.authHeaders(accessToken);
 
         // act
         ResponseEntity<ApiResponse<Object>> response =

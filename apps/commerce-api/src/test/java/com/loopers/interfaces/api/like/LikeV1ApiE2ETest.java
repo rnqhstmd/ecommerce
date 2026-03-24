@@ -4,9 +4,8 @@ import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
-import com.loopers.domain.user.Gender;
 import com.loopers.interfaces.api.ApiResponse;
-import com.loopers.interfaces.api.user.UserV1Dto;
+import com.loopers.support.TestAuthHelper;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,14 +38,12 @@ class LikeV1ApiE2ETest {
     private DatabaseCleanUp databaseCleanUp;
 
     private Long productId;
+    private String accessToken;
 
     @BeforeEach
     void setUp() {
-        // 사용자 생성
-        UserV1Dto.RegisterRequest registerRequest = new UserV1Dto.RegisterRequest(
-                "likeuser01", "like@example.com", "1990-01-01", Gender.MALE
-        );
-        testRestTemplate.postForEntity("/api/v1/users", registerRequest, ApiResponse.class);
+        // 사용자 생성 (auth API로)
+        accessToken = TestAuthHelper.signupAndGetToken(testRestTemplate, "likeuser01", "like@example.com", "password123");
 
         // 상품 생성
         Brand brand = brandRepository.save(Brand.create("Like Brand"));
@@ -63,8 +60,7 @@ class LikeV1ApiE2ETest {
     @Test
     void addLike_success() {
         // arrange
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-USER-ID", "likeuser01");
+        HttpHeaders headers = TestAuthHelper.authHeaders(accessToken);
         LikeV1Dto.LikeRequest request = new LikeV1Dto.LikeRequest(productId);
 
         // act
@@ -90,8 +86,7 @@ class LikeV1ApiE2ETest {
     @Test
     void removeLike_success() {
         // arrange - 먼저 좋아요 등록
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-USER-ID", "likeuser01");
+        HttpHeaders headers = TestAuthHelper.authHeaders(accessToken);
         LikeV1Dto.LikeRequest request = new LikeV1Dto.LikeRequest(productId);
         testRestTemplate.exchange(
                 "/api/v1/likes",
@@ -115,9 +110,9 @@ class LikeV1ApiE2ETest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
-    @DisplayName("POST /api/v1/likes - X-USER-ID 없으면 401을 반환한다.")
+    @DisplayName("POST /api/v1/likes - 토큰 없으면 401을 반환한다.")
     @Test
-    void addLike_returnsUnauthorized_whenNoUserId() {
+    void addLike_returnsUnauthorized_whenNoToken() {
         // arrange
         LikeV1Dto.LikeRequest request = new LikeV1Dto.LikeRequest(productId);
 
@@ -136,9 +131,9 @@ class LikeV1ApiE2ETest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
-    @DisplayName("GET /api/v1/likes - X-USER-ID 없으면 401을 반환한다.")
+    @DisplayName("GET /api/v1/likes - 토큰 없으면 401을 반환한다.")
     @Test
-    void getMyLikes_returnsUnauthorized_whenNoUserId() {
+    void getMyLikes_returnsUnauthorized_whenNoToken() {
         // act
         ResponseEntity<ApiResponse<Object>> response =
                 testRestTemplate.exchange(
@@ -156,8 +151,7 @@ class LikeV1ApiE2ETest {
     @Test
     void getMyLikes_returnsEmptyList() {
         // arrange
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-USER-ID", "likeuser01");
+        HttpHeaders headers = TestAuthHelper.authHeaders(accessToken);
 
         // act
         ResponseEntity<ApiResponse<List<LikeV1Dto.LikeItemResponse>>> response =
@@ -180,8 +174,7 @@ class LikeV1ApiE2ETest {
     @Test
     void getMyLikes_containsLikedProduct() {
         // arrange - 좋아요 등록
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-USER-ID", "likeuser01");
+        HttpHeaders headers = TestAuthHelper.authHeaders(accessToken);
         LikeV1Dto.LikeRequest request = new LikeV1Dto.LikeRequest(productId);
         testRestTemplate.exchange(
                 "/api/v1/likes",

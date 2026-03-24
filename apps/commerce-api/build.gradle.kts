@@ -10,6 +10,12 @@ dependencies {
     // web
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+
+    // security + jwt
+    implementation("org.springframework.boot:spring-boot-starter-security")
+    implementation("io.jsonwebtoken:jjwt-api:0.12.6")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${project.properties["springDocOpenApiVersion"]}")
 
     // redisson (distributed lock)
@@ -30,4 +36,7 @@ dependencies {
 
     // kafka test
     testImplementation("org.springframework.kafka:spring-kafka-test")
+
+    // security test
+    testImplementation("org.springframework.security:spring-security-test")
 }

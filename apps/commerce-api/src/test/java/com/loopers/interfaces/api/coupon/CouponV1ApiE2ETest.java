@@ -3,9 +3,8 @@ package com.loopers.interfaces.api.coupon;
 import com.loopers.domain.coupon.CouponPolicy;
 import com.loopers.domain.coupon.CouponService;
 import com.loopers.domain.coupon.DiscountType;
-import com.loopers.domain.user.Gender;
 import com.loopers.interfaces.api.ApiResponse;
-import com.loopers.interfaces.api.user.UserV1Dto;
+import com.loopers.support.TestAuthHelper;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,14 +38,12 @@ class CouponV1ApiE2ETest {
 
     private static final String USER_ID = "couponuser";
     private Long couponPolicyId;
+    private String accessToken;
 
     @BeforeEach
     void setUp() {
-        // 사용자 생성
-        UserV1Dto.RegisterRequest registerRequest = new UserV1Dto.RegisterRequest(
-                USER_ID, "coupon@example.com", "1990-01-01", Gender.MALE
-        );
-        testRestTemplate.postForEntity("/api/v1/users", registerRequest, ApiResponse.class);
+        // 사용자 생성 (auth API로)
+        accessToken = TestAuthHelper.signupAndGetToken(testRestTemplate, USER_ID, "coupon@example.com", "password123");
 
         // 쿠폰 정책 생성
         CouponPolicy policy = CouponPolicy.create(
@@ -71,8 +68,7 @@ class CouponV1ApiE2ETest {
     @Test
     void issueCoupon_success() {
         // arrange
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-USER-ID", USER_ID);
+        HttpHeaders headers = TestAuthHelper.authHeaders(accessToken);
 
         // act
         ResponseEntity<String> response =
@@ -94,9 +90,9 @@ class CouponV1ApiE2ETest {
         );
     }
 
-    @DisplayName("POST /api/v1/coupons/{id}/issue - X-USER-ID 없으면 401을 반환한다.")
+    @DisplayName("POST /api/v1/coupons/{id}/issue - 토큰 없으면 401을 반환한다.")
     @Test
-    void issueCoupon_returnsUnauthorized_whenNoUserId() {
+    void issueCoupon_returnsUnauthorized_whenNoToken() {
         // act
         ResponseEntity<String> response =
                 testRestTemplate.exchange(

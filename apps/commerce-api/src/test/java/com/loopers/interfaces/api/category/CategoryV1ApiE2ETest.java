@@ -1,8 +1,11 @@
 package com.loopers.interfaces.api.category;
 
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.support.TestAuthHelper;
+import com.loopers.support.auth.JwtTokenProvider;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,17 +26,29 @@ class CategoryV1ApiE2ETest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
+    private String adminToken;
+
+    @BeforeEach
+    void setUp() {
+        adminToken = TestAuthHelper.signupAndGetAdminToken(
+                testRestTemplate, jwtTokenProvider,
+                "catadmin", "catadmin@example.com", "password123"
+        );
+    }
+
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
     }
 
-    @DisplayName("POST /api/v1/categories - 카테고리 생성에 성공한다.")
+    @DisplayName("POST /api/v1/categories - ADMIN이 카테고리 생성에 성공한다.")
     @Test
     void createCategory_success() {
         // arrange
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpHeaders headers = TestAuthHelper.authJsonHeaders(adminToken);
         CategoryV1Dto.CreateRequest request = new CategoryV1Dto.CreateRequest("의류", null);
 
         // act
@@ -59,8 +74,7 @@ class CategoryV1ApiE2ETest {
     @Test
     void getCategories_success() {
         // arrange - 카테고리 생성
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpHeaders headers = TestAuthHelper.authJsonHeaders(adminToken);
 
         CategoryV1Dto.CreateRequest rootRequest = new CategoryV1Dto.CreateRequest("전자제품", null);
         testRestTemplate.exchange(
@@ -78,7 +92,7 @@ class CategoryV1ApiE2ETest {
                 String.class
         );
 
-        // act
+        // act (public endpoint)
         ResponseEntity<String> response =
                 testRestTemplate.exchange(
                         "/api/v1/categories",

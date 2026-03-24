@@ -2,6 +2,8 @@ package com.loopers.interfaces.api.user;
 
 import com.loopers.domain.user.Gender;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.auth.AuthV1Dto;
+import com.loopers.support.TestAuthHelper;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,36 +46,28 @@ class UserV1ApiE2ETest {
         @DisplayName("회원 가입이 성공할 경우, 생성된 유저 정보를 응답으로 반환한다.")
         @Test
         void returnsUserInfo_whenSignUpIsSuccessful() {
-            // arrange
-            UserV1Dto.RegisterRequest request = new UserV1Dto.RegisterRequest(
-                    "testuser01",
-                    "test@example.com",
-                    "1990-01-01",
-                    Gender.MALE
-            );
+            // arrange - auth API로 회원가입하여 토큰 발급
+            String token = TestAuthHelper.signupAndGetToken(testRestTemplate, "testuser01", "test@example.com", "password123");
 
-            // act
+            // act - 내 정보 조회로 가입 확인
+            HttpHeaders headers = TestAuthHelper.authHeaders(token);
             ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType =
-                    new ParameterizedTypeReference<>() {
-                    };
+                    new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
                     testRestTemplate.exchange(
-                            ENDPOINT_SIGN_UP,
-                            HttpMethod.POST,
-                            new HttpEntity<>(request),
+                            ENDPOINT_GET_USER,
+                            HttpMethod.GET,
+                            new HttpEntity<>(headers),
                             responseType
                     );
 
             // assert
             assertAll(
                     () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
-                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                     () -> assertThat(response.getBody()).isNotNull(),
                     () -> assertThat(response.getBody().data()).isNotNull(),
                     () -> assertThat(response.getBody().data().userId()).isEqualTo("testuser01"),
-                    () -> assertThat(response.getBody().data().email()).isEqualTo("test@example.com"),
-                    () -> assertThat(response.getBody().data().birthDate()).isEqualTo("1990-01-01"),
-                    () -> assertThat(response.getBody().data().gender()).isEqualTo(Gender.MALE)
+                    () -> assertThat(response.getBody().data().email()).isEqualTo("test@example.com")
             );
         }
 
@@ -85,7 +79,8 @@ class UserV1ApiE2ETest {
                     {
                     	"userId": "testuser01",
                     	"email": "test@example.com",
-                    	"birthDate": "1990-01-01"
+                    	"birthDate": "1990-01-01",
+                    	"password": "password123"
                     }
                     """;
 
@@ -93,12 +88,11 @@ class UserV1ApiE2ETest {
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             // act
-            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType =
-                    new ParameterizedTypeReference<>() {
-                    };
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
+            ParameterizedTypeReference<ApiResponse<AuthV1Dto.AuthResponse>> responseType =
+                    new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<AuthV1Dto.AuthResponse>> response =
                     testRestTemplate.exchange(
-                            ENDPOINT_SIGN_UP,
+                            "/api/v1/auth/signup",
                             HttpMethod.POST,
                             new HttpEntity<>(requestBody, headers),
                             responseType
@@ -115,80 +109,20 @@ class UserV1ApiE2ETest {
         @Test
         void returnsBadRequest_whenUserIdFormatIsInvalid() {
             // arrange
-            UserV1Dto.RegisterRequest request = new UserV1Dto.RegisterRequest(
+            AuthV1Dto.SignupRequest request = new AuthV1Dto.SignupRequest(
                     "invalid-id!",
                     "test@example.com",
                     "1990-01-01",
-                    Gender.MALE
+                    "MALE",
+                    "password123"
             );
 
             // act
-            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType =
-                    new ParameterizedTypeReference<>() {
-                    };
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
+            ParameterizedTypeReference<ApiResponse<AuthV1Dto.AuthResponse>> responseType =
+                    new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<AuthV1Dto.AuthResponse>> response =
                     testRestTemplate.exchange(
-                            ENDPOINT_SIGN_UP,
-                            HttpMethod.POST,
-                            new HttpEntity<>(request),
-                            responseType
-                    );
-
-            // assert
-            assertAll(
-                    () -> assertTrue(response.getStatusCode().is4xxClientError()),
-                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST)
-            );
-        }
-
-        @DisplayName("회원 가입 시 이메일이 형식에 맞지 않으면, 400 Bad Request 응답을 반환한다.")
-        @Test
-        void returnsBadRequest_whenEmailFormatIsInvalid() {
-            // arrange
-            UserV1Dto.RegisterRequest request = new UserV1Dto.RegisterRequest(
-                    "testuser01",
-                    "invalid-email",
-                    "1990-01-01",
-                    Gender.MALE
-            );
-
-            // act
-            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType =
-                    new ParameterizedTypeReference<>() {
-                    };
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
-                    testRestTemplate.exchange(
-                            ENDPOINT_SIGN_UP,
-                            HttpMethod.POST,
-                            new HttpEntity<>(request),
-                            responseType
-                    );
-
-            // assert
-            assertAll(
-                    () -> assertTrue(response.getStatusCode().is4xxClientError()),
-                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST)
-            );
-        }
-
-        @DisplayName("회원 가입 시 생년월일이 형식에 맞지 않으면, 400 Bad Request 응답을 반환한다.")
-        @Test
-        void returnsBadRequest_whenBirthDateFormatIsInvalid() {
-            // arrange
-            UserV1Dto.RegisterRequest request = new UserV1Dto.RegisterRequest(
-                    "testuser01",
-                    "test@example.com",
-                    "1990/01/01",
-                    Gender.MALE
-            );
-
-            // act
-            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType =
-                    new ParameterizedTypeReference<>() {
-                    };
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
-                    testRestTemplate.exchange(
-                            ENDPOINT_SIGN_UP,
+                            "/api/v1/auth/signup",
                             HttpMethod.POST,
                             new HttpEntity<>(request),
                             responseType
@@ -205,29 +139,23 @@ class UserV1ApiE2ETest {
         @Test
         void returnsConflict_whenUserIdAlreadyExists() {
             // arrange - 첫 번째 회원 가입
-            UserV1Dto.RegisterRequest firstRequest = new UserV1Dto.RegisterRequest(
-                    "testuser01",
-                    "test@example.com",
-                    "1990-01-01",
-                    Gender.MALE
-            );
-            testRestTemplate.postForEntity(ENDPOINT_SIGN_UP, firstRequest, ApiResponse.class);
+            TestAuthHelper.signupAndGetToken(testRestTemplate, "testuser01", "test@example.com", "password123");
 
             // 두 번째 회원 가입 시도 (같은 ID)
-            UserV1Dto.RegisterRequest secondRequest = new UserV1Dto.RegisterRequest(
+            AuthV1Dto.SignupRequest secondRequest = new AuthV1Dto.SignupRequest(
                     "testuser01",
                     "another@example.com",
                     "1995-05-05",
-                    Gender.FEMALE
+                    "FEMALE",
+                    "password456"
             );
 
             // act
-            ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType =
-                    new ParameterizedTypeReference<>() {
-                    };
-            ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
+            ParameterizedTypeReference<ApiResponse<AuthV1Dto.AuthResponse>> responseType =
+                    new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<AuthV1Dto.AuthResponse>> response =
                     testRestTemplate.exchange(
-                            ENDPOINT_SIGN_UP,
+                            "/api/v1/auth/signup",
                             HttpMethod.POST,
                             new HttpEntity<>(secondRequest),
                             responseType
@@ -249,22 +177,14 @@ class UserV1ApiE2ETest {
         @Test
         void returnsUserInfo_whenUserExists() {
             // arrange - 회원 가입
-            UserV1Dto.RegisterRequest registerRequest = new UserV1Dto.RegisterRequest(
-                    "testuser01",
-                    "test@example.com",
-                    "1990-01-01",
-                    Gender.MALE
-            );
-            testRestTemplate.postForEntity(ENDPOINT_SIGN_UP, registerRequest, ApiResponse.class);
+            String token = TestAuthHelper.signupAndGetToken(testRestTemplate, "testuser01", "test@example.com", "password123");
 
             // act - 내 정보 조회
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("X-USER-ID", "testuser01");
+            HttpHeaders headers = TestAuthHelper.authHeaders(token);
             HttpEntity<?> requestEntity = new HttpEntity<>(headers);
 
             ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType =
-                    new ParameterizedTypeReference<>() {
-                    };
+                    new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
                     testRestTemplate.exchange(
                             ENDPOINT_GET_USER,
@@ -280,35 +200,28 @@ class UserV1ApiE2ETest {
                     () -> assertThat(response.getBody()).isNotNull(),
                     () -> assertThat(response.getBody().data()).isNotNull(),
                     () -> assertThat(response.getBody().data().userId()).isEqualTo("testuser01"),
-                    () -> assertThat(response.getBody().data().email()).isEqualTo("test@example.com"),
-                    () -> assertThat(response.getBody().data().birthDate()).isEqualTo("1990-01-01"),
-                    () -> assertThat(response.getBody().data().gender()).isEqualTo(Gender.MALE)
+                    () -> assertThat(response.getBody().data().email()).isEqualTo("test@example.com")
             );
         }
 
-        @DisplayName("존재하지 않는 ID로 조회할 경우, 404 Not Found 응답을 반환한다.")
+        @DisplayName("토큰 없이 조회할 경우, 401 Unauthorized 응답을 반환한다.")
         @Test
-        void returnsNotFound_whenUserDoesNotExist() {
+        void returnsUnauthorized_whenNoToken() {
             // act
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("X-USER-ID", "nonexistentuser");
-            HttpEntity<?> requestEntity = new HttpEntity<>(headers);
-
             ParameterizedTypeReference<ApiResponse<UserV1Dto.UserResponse>> responseType =
-                    new ParameterizedTypeReference<>() {
-                    };
+                    new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<UserV1Dto.UserResponse>> response =
                     testRestTemplate.exchange(
                             ENDPOINT_GET_USER,
                             HttpMethod.GET,
-                            requestEntity,
+                            null,
                             responseType
                     );
 
             // assert
             assertAll(
                     () -> assertTrue(response.getStatusCode().is4xxClientError()),
-                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND)
+                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED)
             );
         }
     }

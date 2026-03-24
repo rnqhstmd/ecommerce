@@ -6,6 +6,7 @@ import com.loopers.application.point.PointInfo;
 import com.loopers.domain.point.PointHistory;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.common.PageResponse;
+import com.loopers.support.auth.SecurityContextHelper;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.validation.Valid;
@@ -26,13 +27,8 @@ public class PointV1Controller implements PointV1ApiSpec {
 
     @GetMapping
     @Override
-    public ApiResponse<PointV1Dto.PointResponse> getPoint(
-            @RequestHeader(value = "X-USER-ID", required = false) String userId
-    ) {
-        if (userId == null || userId.isBlank()) {
-            throw new CoreException(ErrorType.UNAUTHORIZED, "X-USER-ID 헤더는 필수입니다.");
-        }
-
+    public ApiResponse<PointV1Dto.PointResponse> getPoint() {
+        String userId = SecurityContextHelper.getCurrentUserId();
         PointInfo pointInfo = pointFacade.getPoint(userId);
         return ApiResponse.success(PointV1Dto.PointResponse.of(pointInfo.userId(), pointInfo.balance()));
     }
@@ -40,13 +36,9 @@ public class PointV1Controller implements PointV1ApiSpec {
     @PostMapping("/charge")
     @Override
     public ApiResponse<PointV1Dto.PointResponse> chargePoint(
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @RequestBody @Valid PointV1Dto.ChargeRequest request
     ) {
-        if (userId == null || userId.isBlank()) {
-            throw new CoreException(ErrorType.UNAUTHORIZED, "X-USER-ID 헤더는 필수입니다.");
-        }
-
+        String userId = SecurityContextHelper.getCurrentUserId();
         PointCommand command = request.toCommand(userId);
         PointInfo pointInfo = pointFacade.chargePoint(command);
 
@@ -56,13 +48,10 @@ public class PointV1Controller implements PointV1ApiSpec {
     @GetMapping("/history")
     @Override
     public ApiResponse<PageResponse<PointV1Dto.PointHistoryResponse>> getPointHistory(
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        if (userId == null || userId.isBlank()) {
-            throw new CoreException(ErrorType.UNAUTHORIZED, "X-USER-ID 헤더는 필수입니다.");
-        }
+        String userId = SecurityContextHelper.getCurrentUserId();
         if (page < 0 || size < 1 || size > 100) {
             throw new CoreException(ErrorType.BAD_REQUEST, "page는 0 이상, size는 1 이상 100 이하여야 합니다.");
         }

@@ -7,6 +7,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -57,8 +59,9 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     }
 
     private String resolveIdentifier(HttpServletRequest request) {
-        String userId = request.getHeader("X-USER-ID");
-        if (userId != null && !userId.isBlank()) {
+        // JWT 인증된 사용자는 SecurityContext에서 userId 추출
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof String userId) {
             return "user:" + userId;
         }
         // IP 폴백: X-Forwarded-For는 클라이언트가 조작 가능하므로 remoteAddr만 사용

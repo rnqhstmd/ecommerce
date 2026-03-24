@@ -9,7 +9,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 
 @Tag(name = "Cart API", description = "장바구니 관리 API")
 public interface CartV1ApiSpec {
@@ -30,8 +29,6 @@ public interface CartV1ApiSpec {
             )
     })
     ApiResponse<CartV1Dto.AddItemResponse> addItem(
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @Parameter(description = "장바구니 추가 요청", required = true)
             @RequestBody CartV1Dto.AddItemRequest request
     );
@@ -51,8 +48,6 @@ public interface CartV1ApiSpec {
             )
     })
     ApiResponse<Void> removeItem(
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @Parameter(description = "상품 ID", required = true)
             @PathVariable Long productId
     );
@@ -68,10 +63,7 @@ public interface CartV1ApiSpec {
                     content = @Content(schema = @Schema(implementation = ApiResponse.class))
             )
     })
-    ApiResponse<CartV1Dto.CartResponse> getCart(
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader(value = "X-USER-ID", required = false) String userId
-    );
+    ApiResponse<CartV1Dto.CartResponse> getCart();
 
     @Operation(summary = "장바구니 주문 전환", description = "장바구니 전체를 주문으로 전환합니다.")
     @ApiResponses(value = {
@@ -88,8 +80,5 @@ public interface CartV1ApiSpec {
                     content = @Content(schema = @Schema(implementation = ApiResponse.class))
             )
     })
-    ApiResponse<CartV1Dto.CheckoutResponse> checkout(
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader(value = "X-USER-ID", required = false) String userId
-    );
+    ApiResponse<CartV1Dto.CheckoutResponse> checkout();
 }

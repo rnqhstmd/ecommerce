@@ -29,6 +29,20 @@ public class UserService {
         return savedUser;
     }
 
+    @Transactional
+    public User signUpWithPassword(String userId, String email, String birthDate, Gender gender, String encodedPassword) {
+        if (userRepository.existsByUserId(userId)) {
+            throw new CoreException(ErrorType.CONFLICT, "이미 가입된 ID입니다.");
+        }
+
+        User user = User.createWithPassword(userId, email, birthDate, gender, encodedPassword);
+        User savedUser = userRepository.save(user);
+
+        eventPublisher.publishEvent(new UserSignedUpEvent(savedUser.getUserIdValue()));
+
+        return savedUser;
+    }
+
     public User getUserByUserId(String userId) {
         return userRepository.findByUserId(userId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "사용자를 찾을 수 없습니다."));
