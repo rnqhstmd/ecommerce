@@ -5,6 +5,7 @@ import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.order.OrderSearchCondition;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -43,5 +44,14 @@ public class OrderRepositoryImpl implements OrderRepository {
                 condition.status(),
                 condition.pageable()
         );
+    }
+
+    @Override
+    public List<Order> findByUserIdWithCursor(String userId, Long cursor, int size) {
+        List<Long> ids = jpaRepository.findOrderIdsByUserIdWithCursor(userId, cursor, PageRequest.of(0, size + 1));
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return jpaRepository.findAllByIdInWithOrderItems(ids);
     }
 }

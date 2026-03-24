@@ -4,9 +4,11 @@ import com.loopers.domain.review.Review;
 import com.loopers.domain.review.ReviewRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -33,6 +35,11 @@ public class ReviewRepositoryImpl implements ReviewRepository {
     @Override
     public Optional<Double> getAverageRatingByProductId(Long productId) {
         return jpaRepository.getAverageRatingByProductId(productId);
+    }
+
+    @Override
+    public List<Review> findByProductIdWithCursor(Long productId, Long cursor, int size) {
+        return jpaRepository.findByProductIdWithCursor(productId, cursor, PageRequest.of(0, size + 1));
     }
 
     @Override

@@ -11,4 +11,5 @@ public interface OrderRepository {
     List<Order> findAllByUserId(String userId);
     Optional<Order> findByIdWithLock(Long orderId);
     Page<Order> findByUserIdAndCondition(OrderSearchCondition condition);
+    List<Order> findByUserIdWithCursor(String userId, Long cursor, int size);
 }

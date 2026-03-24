@@ -5,6 +5,8 @@ import com.loopers.application.order.OrderInfo;
 import com.loopers.application.order.OrderPlaceCommand;
 import com.loopers.domain.order.OrderStatus;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.common.CursorPageRequest;
+import com.loopers.interfaces.api.common.CursorPageResponse;
 import com.loopers.interfaces.api.common.PageResponse;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -12,6 +14,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -62,6 +66,23 @@ public class OrderV1Controller implements OrderV1ApiSpec {
                 orderFacade.getMyOrdersPaged(userId, orderStatus, PageRequest.of(page, size));
 
         return ApiResponse.success(pageResponse.map(OrderV1Dto.OrderSummaryResponse::from));
+    }
+
+    @GetMapping("/cursor")
+    @Override
+    public ApiResponse<CursorPageResponse<OrderV1Dto.OrderSummaryResponse>> getOrdersWithCursor(
+            @RequestHeader(value = "X-USER-ID", required = false) String userId,
+            @Valid @ModelAttribute CursorPageRequest cursorPageRequest
+    ) {
+        validateUserId(userId);
+
+        List<OrderInfo.OrderSummaryInfo> summaries = orderFacade.getMyOrdersWithCursor(userId, cursorPageRequest.cursor(), cursorPageRequest.size());
+        CursorPageResponse<OrderV1Dto.OrderSummaryResponse> response = CursorPageResponse.of(
+                summaries, cursorPageRequest.size(),
+                OrderInfo.OrderSummaryInfo::orderId,
+                OrderV1Dto.OrderSummaryResponse::from
+        );
+        return ApiResponse.success(response);
     }
 
     @GetMapping("/{id}")

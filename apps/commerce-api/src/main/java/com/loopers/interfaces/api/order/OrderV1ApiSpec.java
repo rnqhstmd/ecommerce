@@ -1,6 +1,8 @@
 package com.loopers.interfaces.api.order;
 
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.common.CursorPageRequest;
+import com.loopers.interfaces.api.common.CursorPageResponse;
 import com.loopers.interfaces.api.common.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -8,6 +10,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -123,5 +126,30 @@ public interface OrderV1ApiSpec {
             @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @Parameter(description = "주문 ID", required = true)
             @PathVariable Long id
+    );
+
+    @Operation(summary = "내 주문 목록 커서 조회", description = "로그인한 사용자의 주문 목록을 커서 기반 페이지네이션으로 조회합니다.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = CursorPageResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "잘못된 요청",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401",
+                    description = "인증 필요",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            )
+    })
+    ApiResponse<CursorPageResponse<OrderV1Dto.OrderSummaryResponse>> getOrdersWithCursor(
+            @Parameter(description = "사용자 ID", required = true)
+            @RequestHeader(value = "X-USER-ID", required = false) String userId,
+            @Parameter(description = "커서 페이지 요청 정보")
+            @ModelAttribute CursorPageRequest cursorPageRequest
     );
 }

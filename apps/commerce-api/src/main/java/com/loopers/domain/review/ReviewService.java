@@ -8,6 +8,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -34,5 +36,9 @@ public class ReviewService {
 
     public long getReviewCount(Long productId) {
         return reviewRepository.countByProductId(productId);
+    }
+
+    public List<Review> getReviewsByProductIdWithCursor(Long productId, Long cursor, int size) {
+        return reviewRepository.findByProductIdWithCursor(productId, cursor, size);
     }
 }
