@@ -5,6 +5,7 @@ import com.loopers.application.review.ReviewInfo;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.common.CursorPageRequest;
 import com.loopers.interfaces.api.common.CursorPageResponse;
+import com.loopers.support.auth.SecurityContextHelper;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.validation.Valid;
@@ -24,10 +25,9 @@ public class ReviewV1Controller implements ReviewV1ApiSpec {
     @PostMapping("/reviews")
     @Override
     public ApiResponse<ReviewV1Dto.ReviewResponse> createReview(
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @RequestBody @Valid ReviewV1Dto.CreateReviewRequest request
     ) {
-        validateUserId(userId);
+        String userId = SecurityContextHelper.getCurrentUserId();
         ReviewInfo info = reviewFacade.createReview(
                 userId, request.orderId(), request.productId(), request.rating(), request.content()
         );
@@ -61,11 +61,5 @@ public class ReviewV1Controller implements ReviewV1ApiSpec {
                 ReviewV1Dto.ReviewResponse::from
         );
         return ApiResponse.success(response);
-    }
-
-    private void validateUserId(String userId) {
-        if (userId == null || userId.isBlank()) {
-            throw new CoreException(ErrorType.UNAUTHORIZED, "X-USER-ID 헤더는 필수입니다.");
-        }
     }
 }

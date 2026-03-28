@@ -12,7 +12,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 
 @Tag(name = "Review API", description = "리뷰 관리 API")
@@ -32,13 +31,11 @@ public interface ReviewV1ApiSpec {
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401",
-                    description = "인증 실패 (X-USER-ID 누락)",
+                    description = "인증 실패",
                     content = @Content(schema = @Schema(implementation = ApiResponse.class))
             )
     })
     ApiResponse<ReviewV1Dto.ReviewResponse> createReview(
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @Parameter(description = "리뷰 작성 요청 정보", required = true)
             @RequestBody ReviewV1Dto.CreateReviewRequest request
     );

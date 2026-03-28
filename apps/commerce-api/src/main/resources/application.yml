@@ -61,6 +61,11 @@ resilience4j:
         max-attempts: 3
         wait-duration: 500ms
 
+jwt:
+  secret: ${JWT_SECRET:Y29tbWVyY2UtYXBpLXNlY3JldC1rZXktZm9yLWp3dC10b2tlbi1nZW5lcmF0aW9uLTIwMjQ=}
+  access-expiration: 1800000
+  refresh-expiration: 604800000
+
 springdoc:
   use-fqn: true
   swagger-ui:

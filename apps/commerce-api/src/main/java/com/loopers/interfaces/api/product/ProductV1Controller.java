@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.*;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.support.auth.SecurityContextHelper;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.validation.Valid;
@@ -34,11 +35,10 @@ public class ProductV1Controller implements ProductV1ApiSpec {
     @GetMapping("/{productId}")
     @Override
     public ApiResponse<ProductV1Dto.ProductResponse> getProduct(
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @PathVariable Long productId
     ) {
-        String normalizedUserId = (userId == null || userId.isBlank()) ? null : userId;
-        ProductDetailInfo info = productFacade.getProductDetail(productId, normalizedUserId);
+        String userId = SecurityContextHelper.getCurrentUserIdOrNull();
+        ProductDetailInfo info = productFacade.getProductDetail(productId, userId);
         return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
     }
 
@@ -77,7 +77,6 @@ public class ProductV1Controller implements ProductV1ApiSpec {
     @GetMapping
     @Override
     public ApiResponse<ProductV1Dto.ProductListResponse> getProducts(
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @RequestParam(required = false) Long brandId,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Long minPrice,
@@ -116,11 +115,11 @@ public class ProductV1Controller implements ProductV1ApiSpec {
             throw new CoreException(ErrorType.BAD_REQUEST, "minPrice는 maxPrice보다 클 수 없습니다.");
         }
 
-        String normalizedUserId = (userId == null || userId.isBlank()) ? null : userId;
+        String userId = SecurityContextHelper.getCurrentUserIdOrNull();
         Sort sortOrder = parseSort(sort);
         Pageable pageable = PageRequest.of(page, size, sortOrder);
         ProductGetListCommand command = new ProductGetListCommand(
-                brandId, normalizedUserId, normalizedKeyword, minPrice, maxPrice, pageable
+                brandId, userId, normalizedKeyword, minPrice, maxPrice, pageable
         );
         ProductListInfo info = productFacade.getProducts(command);
         return ApiResponse.success(ProductV1Dto.ProductListResponse.from(info));
@@ -135,4 +134,5 @@ public class ProductV1Controller implements ProductV1ApiSpec {
                     "sort는 latest, price_asc, likes_desc 중 하나여야 합니다.");
         };
     }
+
 }

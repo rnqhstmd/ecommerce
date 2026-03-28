@@ -2,9 +2,10 @@ package com.loopers.interfaces.api.point;
 
 import com.loopers.application.point.PointCommand;
 import com.loopers.application.point.PointFacade;
-import com.loopers.domain.user.Gender;
 import com.loopers.interfaces.api.ApiResponse;
-import com.loopers.interfaces.api.user.UserV1Dto;
+import com.loopers.support.TestAuthHelper;
+import com.loopers.support.auth.JwtTokenProvider;
+import com.loopers.domain.user.Role;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,23 +24,25 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class PointV1ApiE2ETest {
 
-	private static final String ENDPOINT_SIGN_UP = "/api/v1/users";
 	private static final String ENDPOINT_GET_POINT = "/api/v1/points";
 	private static final String ENDPOINT_CHARGE_POINT = "/api/v1/points/charge";
 
 	private final TestRestTemplate testRestTemplate;
 	private final DatabaseCleanUp databaseCleanUp;
 	private final PointFacade pointFacade;
+	private final JwtTokenProvider jwtTokenProvider;
 
 	@Autowired
 	public PointV1ApiE2ETest(
 			TestRestTemplate testRestTemplate,
 			DatabaseCleanUp databaseCleanUp,
-			PointFacade pointFacade
+			PointFacade pointFacade,
+			JwtTokenProvider jwtTokenProvider
 	) {
 		this.testRestTemplate = testRestTemplate;
 		this.databaseCleanUp = databaseCleanUp;
 		this.pointFacade = pointFacade;
+		this.jwtTokenProvider = jwtTokenProvider;
 	}
 
 	@AfterEach
@@ -54,22 +57,14 @@ class PointV1ApiE2ETest {
 		@DisplayName("포인트 조회에 성공할 경우, 보유 포인트를 응답으로 반환한다.")
 		@Test
 		void returnsPointAmount_whenPointExists() {
-			// arrange - 회원 가입 (포인트 자동 생성됨)
-			UserV1Dto.RegisterRequest registerRequest = new UserV1Dto.RegisterRequest(
-					"testuser01",
-					"test@example.com",
-					"1990-01-01",
-					Gender.MALE
-			);
-			testRestTemplate.postForEntity(ENDPOINT_SIGN_UP, registerRequest, ApiResponse.class);
+			// arrange - 회원 가입 (auth API로)
+			String token = TestAuthHelper.signupAndGetToken(testRestTemplate, "testuser01", "test@example.com", "password123");
 
 			// 포인트 충전
-            PointCommand command = new PointCommand("testuser01", 5000L);
+			PointCommand command = new PointCommand("testuser01", 5000L);
 			pointFacade.chargePoint(command);
 
-			// HTTP 헤더 설정
-			HttpHeaders headers = new HttpHeaders();
-			headers.set("X-USER-ID", "testuser01");
+			HttpHeaders headers = TestAuthHelper.authHeaders(token);
 
 			// act
 			ParameterizedTypeReference<ApiResponse<PointV1Dto.PointResponse>> responseType =
@@ -96,18 +91,10 @@ class PointV1ApiE2ETest {
 		@DisplayName("회원 가입 직후 포인트 조회 시, 초기 포인트 0을 반환한다.")
 		@Test
 		void returnsZeroPoint_afterSignUp() {
-			// arrange - 회원 가입 (포인트 자동 생성됨)
-			UserV1Dto.RegisterRequest registerRequest = new UserV1Dto.RegisterRequest(
-					"testuser01",
-					"test@example.com",
-					"1990-01-01",
-					Gender.MALE
-			);
-			testRestTemplate.postForEntity(ENDPOINT_SIGN_UP, registerRequest, ApiResponse.class);
+			// arrange - 회원 가입 (auth API로)
+			String token = TestAuthHelper.signupAndGetToken(testRestTemplate, "testuser01", "test@example.com", "password123");
 
-			// HTTP 헤더 설정
-			HttpHeaders headers = new HttpHeaders();
-			headers.set("X-USER-ID", "testuser01");
+			HttpHeaders headers = TestAuthHelper.authHeaders(token);
 
 			// act
 			ParameterizedTypeReference<ApiResponse<PointV1Dto.PointResponse>> responseType =
@@ -131,9 +118,9 @@ class PointV1ApiE2ETest {
 			);
 		}
 
-		@DisplayName("X-USER-ID 헤더가 없을 경우, 401 Unauthorized 응답을 반환한다.")
+		@DisplayName("토큰이 없을 경우, 401 Unauthorized 응답을 반환한다.")
 		@Test
-		void returnsUnauthorized_whenUserIdHeaderIsMissing() {
+		void returnsUnauthorized_whenTokenIsMissing() {
 			// act - 헤더 없이 요청
 			ParameterizedTypeReference<ApiResponse<PointV1Dto.PointResponse>> responseType =
 					new ParameterizedTypeReference<>() {};
@@ -152,37 +139,12 @@ class PointV1ApiE2ETest {
 			);
 		}
 
-		@DisplayName("X-USER-ID 헤더가 빈 문자열일 경우, 401 Unauthorized 응답을 반환한다.")
+		@DisplayName("유효하지 않은 토큰일 경우, 401 Unauthorized 응답을 반환한다.")
 		@Test
-		void returnsUnauthorized_whenUserIdHeaderIsEmpty() {
+		void returnsUnauthorized_whenTokenIsInvalid() {
 			// arrange
 			HttpHeaders headers = new HttpHeaders();
-			headers.set("X-USER-ID", "");
-
-			// act
-			ParameterizedTypeReference<ApiResponse<PointV1Dto.PointResponse>> responseType =
-					new ParameterizedTypeReference<>() {};
-			ResponseEntity<ApiResponse<PointV1Dto.PointResponse>> response =
-					testRestTemplate.exchange(
-							ENDPOINT_GET_POINT,
-							HttpMethod.GET,
-							new HttpEntity<>(headers),
-							responseType
-					);
-
-			// assert
-			assertAll(
-					() -> assertTrue(response.getStatusCode().is4xxClientError()),
-					() -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED)
-			);
-		}
-
-		@DisplayName("X-USER-ID 헤더가 공백 문자열일 경우, 401 Unauthorized 응답을 반환한다.")
-		@Test
-		void returnsUnauthorized_whenUserIdHeaderIsBlank() {
-			// arrange
-			HttpHeaders headers = new HttpHeaders();
-			headers.set("X-USER-ID", "   ");
+			headers.set("Authorization", "Bearer invalid-token");
 
 			// act
 			ParameterizedTypeReference<ApiResponse<PointV1Dto.PointResponse>> responseType =
@@ -205,9 +167,9 @@ class PointV1ApiE2ETest {
 		@DisplayName("존재하지 않는 사용자의 포인트 조회 시, 404 Not Found 응답을 반환한다.")
 		@Test
 		void returnsNotFound_whenUserDoesNotExist() {
-			// arrange
-			HttpHeaders headers = new HttpHeaders();
-			headers.set("X-USER-ID", "nonexistentuser");
+			// arrange - 존재하지 않는 사용자 토큰 직접 생성
+			String fakeToken = jwtTokenProvider.createAccessToken("nonexistent", Role.USER);
+			HttpHeaders headers = TestAuthHelper.authHeaders(fakeToken);
 
 			// act
 			ParameterizedTypeReference<ApiResponse<PointV1Dto.PointResponse>> responseType =
@@ -235,21 +197,12 @@ class PointV1ApiE2ETest {
 		@DisplayName("존재하는 유저가 1000원을 충전할 경우, 충전된 보유 총량을 응답으로 반환한다.")
 		@Test
 		void returnsChargedAmount_whenUserExistsAndCharges1000() {
-			// arrange - 회원 가입 (포인트 자동 생성됨)
-			UserV1Dto.RegisterRequest registerRequest = new UserV1Dto.RegisterRequest(
-					"testuser01",
-					"test@example.com",
-					"1990-01-01",
-					Gender.MALE
-			);
-			testRestTemplate.postForEntity(ENDPOINT_SIGN_UP, registerRequest, ApiResponse.class);
+			// arrange - 회원 가입 (auth API로)
+			String token = TestAuthHelper.signupAndGetToken(testRestTemplate, "testuser01", "test@example.com", "password123");
 
 			// 충전 요청 생성
 			PointV1Dto.ChargeRequest chargeRequest = new PointV1Dto.ChargeRequest(1000L);
-
-			// HTTP 헤더 설정
-			HttpHeaders headers = new HttpHeaders();
-			headers.set("X-USER-ID", "testuser01");
+			HttpHeaders headers = TestAuthHelper.authHeaders(token);
 
 			// act
 			ParameterizedTypeReference<ApiResponse<PointV1Dto.PointResponse>> responseType =
@@ -276,17 +229,10 @@ class PointV1ApiE2ETest {
 		@DisplayName("여러 번 충전할 경우, 누적된 총량을 응답으로 반환한다.")
 		@Test
 		void returnsAccumulatedAmount_whenChargedMultipleTimes() {
-			// arrange - 회원 가입 및 초기 충전
-			UserV1Dto.RegisterRequest registerRequest = new UserV1Dto.RegisterRequest(
-					"testuser01",
-					"test@example.com",
-					"1990-01-01",
-					Gender.MALE
-			);
-			testRestTemplate.postForEntity(ENDPOINT_SIGN_UP, registerRequest, ApiResponse.class);
+			// arrange - 회원 가입
+			String token = TestAuthHelper.signupAndGetToken(testRestTemplate, "testuser01", "test@example.com", "password123");
 
-			HttpHeaders headers = new HttpHeaders();
-			headers.set("X-USER-ID", "testuser01");
+			HttpHeaders headers = TestAuthHelper.authHeaders(token);
 
 			// 첫 번째 충전
 			PointV1Dto.ChargeRequest firstCharge = new PointV1Dto.ChargeRequest(1000L);
@@ -326,8 +272,8 @@ class PointV1ApiE2ETest {
 		void returnsNotFound_whenUserDoesNotExist() {
 			// arrange
 			PointV1Dto.ChargeRequest chargeRequest = new PointV1Dto.ChargeRequest(1000L);
-			HttpHeaders headers = new HttpHeaders();
-			headers.set("X-USER-ID", "nonexistentuser");
+			String fakeToken = jwtTokenProvider.createAccessToken("nonexistent", Role.USER);
+			HttpHeaders headers = TestAuthHelper.authHeaders(fakeToken);
 
 			// act
 			ParameterizedTypeReference<ApiResponse<PointV1Dto.PointResponse>> responseType =
@@ -347,9 +293,9 @@ class PointV1ApiE2ETest {
 			);
 		}
 
-		@DisplayName("X-USER-ID 헤더가 없을 경우, 401 Unauthorized 응답을 반환한다.")
+		@DisplayName("토큰이 없을 경우, 401 Unauthorized 응답을 반환한다.")
 		@Test
-		void returnsUnauthorized_whenUserIdHeaderIsMissing() {
+		void returnsUnauthorized_whenTokenIsMissing() {
 			// arrange
 			PointV1Dto.ChargeRequest chargeRequest = new PointV1Dto.ChargeRequest(1000L);
 
@@ -375,17 +321,10 @@ class PointV1ApiE2ETest {
 		@Test
 		void returnsBadRequest_whenChargeAmountIsZero() {
 			// arrange - 회원 가입
-			UserV1Dto.RegisterRequest registerRequest = new UserV1Dto.RegisterRequest(
-					"testuser01",
-					"test@example.com",
-					"1990-01-01",
-					Gender.MALE
-			);
-			testRestTemplate.postForEntity(ENDPOINT_SIGN_UP, registerRequest, ApiResponse.class);
+			String token = TestAuthHelper.signupAndGetToken(testRestTemplate, "testuser01", "test@example.com", "password123");
 
 			PointV1Dto.ChargeRequest chargeRequest = new PointV1Dto.ChargeRequest(0L);
-			HttpHeaders headers = new HttpHeaders();
-			headers.set("X-USER-ID", "testuser01");
+			HttpHeaders headers = TestAuthHelper.authHeaders(token);
 
 			// act
 			ParameterizedTypeReference<ApiResponse<PointV1Dto.PointResponse>> responseType =
@@ -409,17 +348,10 @@ class PointV1ApiE2ETest {
 		@Test
 		void returnsBadRequest_whenChargeAmountIsNegative() {
 			// arrange - 회원 가입
-			UserV1Dto.RegisterRequest registerRequest = new UserV1Dto.RegisterRequest(
-					"testuser01",
-					"test@example.com",
-					"1990-01-01",
-					Gender.MALE
-			);
-			testRestTemplate.postForEntity(ENDPOINT_SIGN_UP, registerRequest, ApiResponse.class);
+			String token = TestAuthHelper.signupAndGetToken(testRestTemplate, "testuser01", "test@example.com", "password123");
 
 			PointV1Dto.ChargeRequest chargeRequest = new PointV1Dto.ChargeRequest(-1000L);
-			HttpHeaders headers = new HttpHeaders();
-			headers.set("X-USER-ID", "testuser01");
+			HttpHeaders headers = TestAuthHelper.authHeaders(token);
 
 			// act
 			ParameterizedTypeReference<ApiResponse<PointV1Dto.PointResponse>> responseType =

@@ -5,10 +5,9 @@ import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.point.PointService;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
-import com.loopers.domain.user.Gender;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.order.OrderV1Dto;
-import com.loopers.interfaces.api.user.UserV1Dto;
+import com.loopers.support.TestAuthHelper;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,14 +45,12 @@ class ReviewV1ApiE2ETest {
     private static final String USER_ID = "reviewuser";
     private Long productId;
     private Long orderId;
+    private String accessToken;
 
     @BeforeEach
     void setUp() {
-        // 사용자 생성
-        UserV1Dto.RegisterRequest registerRequest = new UserV1Dto.RegisterRequest(
-                USER_ID, "review@example.com", "1990-01-01", Gender.MALE
-        );
-        testRestTemplate.postForEntity("/api/v1/users", registerRequest, ApiResponse.class);
+        // 사용자 생성 (auth API로)
+        accessToken = TestAuthHelper.signupAndGetToken(testRestTemplate, USER_ID, "review@example.com", "password123");
 
         // 포인트 충전
         pointService.chargePoint(USER_ID, 1000000L);
@@ -64,9 +61,7 @@ class ReviewV1ApiE2ETest {
         productId = product.getId();
 
         // 주문 생성 (PAID 상태)
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-USER-ID", USER_ID);
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpHeaders headers = TestAuthHelper.authJsonHeaders(accessToken);
         OrderV1Dto.PlaceOrderRequest orderRequest = new OrderV1Dto.PlaceOrderRequest(
                 List.of(new OrderV1Dto.OrderItemRequest(productId, 1)),
                 null
@@ -90,9 +85,7 @@ class ReviewV1ApiE2ETest {
     @Test
     void createReview_success() {
         // arrange
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-USER-ID", USER_ID);
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpHeaders headers = TestAuthHelper.authJsonHeaders(accessToken);
         ReviewV1Dto.CreateReviewRequest request = new ReviewV1Dto.CreateReviewRequest(
                 orderId, productId, 5, "정말 좋은 상품입니다!"
         );
@@ -116,9 +109,9 @@ class ReviewV1ApiE2ETest {
         );
     }
 
-    @DisplayName("POST /api/v1/reviews - X-USER-ID 없으면 401을 반환한다.")
+    @DisplayName("POST /api/v1/reviews - 토큰 없으면 401을 반환한다.")
     @Test
-    void createReview_returnsUnauthorized_whenNoUserId() {
+    void createReview_returnsUnauthorized_whenNoToken() {
         // arrange
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -143,9 +136,7 @@ class ReviewV1ApiE2ETest {
     @Test
     void getProductReviews_success() {
         // arrange - 리뷰 작성
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-USER-ID", USER_ID);
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpHeaders headers = TestAuthHelper.authJsonHeaders(accessToken);
         ReviewV1Dto.CreateReviewRequest request = new ReviewV1Dto.CreateReviewRequest(
                 orderId, productId, 4, "괜찮은 상품입니다."
         );
@@ -156,7 +147,7 @@ class ReviewV1ApiE2ETest {
                 String.class
         );
 
-        // act
+        // act (공개 API이므로 토큰 불필요)
         ResponseEntity<String> response =
                 testRestTemplate.exchange(
                         "/api/v1/products/" + productId + "/reviews",

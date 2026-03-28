@@ -36,13 +36,22 @@ public class User extends BaseEntity {
     @Column(name = "gender", nullable = false, length = 10)
     private Gender gender;
 
-    private User(String userId, Email email, BirthDate birthDate, Gender gender) {
+    @Column(name = "password", length = 255)
+    private String password;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 10)
+    private Role role;
+
+    private User(String userId, Email email, BirthDate birthDate, Gender gender, String password, Role role) {
         validateUserId(userId);
         validateRequiredFields(userId, email, birthDate, gender);
         this.userId = userId;
         this.email = email;
         this.birthDate = birthDate;
         this.gender = gender;
+        this.password = password;
+        this.role = role != null ? role : Role.USER;
     }
 
     public static User create(String userId, String email, String birthDate, Gender gender) {
@@ -53,7 +62,26 @@ public class User extends BaseEntity {
                 userId,
                 new Email(email),
                 new BirthDate(birthDate),
-                gender
+                gender,
+                null,
+                Role.USER
+        );
+    }
+
+    public static User createWithPassword(String userId, String email, String birthDate, Gender gender, String encodedPassword) {
+        if (gender == null) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "성별은 필수입니다.");
+        }
+        if (encodedPassword == null || encodedPassword.isBlank()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "비밀번호는 필수입니다.");
+        }
+        return new User(
+                userId,
+                new Email(email),
+                new BirthDate(birthDate),
+                gender,
+                encodedPassword,
+                Role.USER
         );
     }
 

@@ -9,13 +9,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 
 @Tag(name = "Product API", description = "상품 관리 API")
 public interface ProductV1ApiSpec {
 
-    @Operation(summary = "상품 생성", description = "새로운 상품을 등록합니다.")
+    @Operation(summary = "상품 생성", description = "새로운 상품을 등록합니다. (ADMIN 전용)")
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200",
@@ -25,6 +24,11 @@ public interface ProductV1ApiSpec {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400",
                     description = "잘못된 요청",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "403",
+                    description = "권한 없음",
                     content = @Content(schema = @Schema(implementation = ApiResponse.class))
             )
     })
@@ -47,13 +51,11 @@ public interface ProductV1ApiSpec {
             )
     })
     ApiResponse<ProductV1Dto.ProductResponse> getProduct(
-            @Parameter(description = "사용자 ID (선택, 로그인 시 isLiked 포함)")
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @Parameter(description = "상품 ID", required = true)
             @PathVariable Long productId
     );
 
-    @Operation(summary = "상품 수정", description = "상품의 이름 또는 가격을 수정합니다.")
+    @Operation(summary = "상품 수정", description = "상품의 이름 또는 가격을 수정합니다. (ADMIN 전용)")
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200", description = "수정 성공",
@@ -61,6 +63,10 @@ public interface ProductV1ApiSpec {
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400", description = "잘못된 요청",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "403", description = "권한 없음",
                     content = @Content(schema = @Schema(implementation = ApiResponse.class))
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -75,7 +81,7 @@ public interface ProductV1ApiSpec {
             @RequestBody ProductV1Dto.UpdateRequest request
     );
 
-    @Operation(summary = "재고 입고", description = "상품의 재고를 증가시킵니다.")
+    @Operation(summary = "재고 입고", description = "상품의 재고를 증가시킵니다. (ADMIN 전용)")
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200", description = "입고 성공",
@@ -83,6 +89,10 @@ public interface ProductV1ApiSpec {
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400", description = "잘못된 요청",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "403", description = "권한 없음",
                     content = @Content(schema = @Schema(implementation = ApiResponse.class))
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -127,8 +137,6 @@ public interface ProductV1ApiSpec {
             )
     })
     ApiResponse<ProductV1Dto.ProductListResponse> getProducts(
-            @Parameter(description = "사용자 ID (선택, 로그인 시 isLiked 포함)")
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @Parameter(description = "브랜드 ID 필터 (선택)")
             @RequestParam(required = false) Long brandId,
             @Parameter(description = "상품명 키워드 검색 (선택, 최대 100자)")

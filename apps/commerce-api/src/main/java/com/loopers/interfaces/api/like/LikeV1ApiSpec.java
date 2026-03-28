@@ -10,7 +10,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 
 import java.util.List;
 
@@ -31,8 +30,6 @@ public interface LikeV1ApiSpec {
             )
     })
     ApiResponse<LikeV1Dto.LikeResponse> addLike(
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @Parameter(description = "좋아요 요청 정보", required = true)
             @RequestBody LikeV1Dto.LikeRequest request
     );
@@ -50,8 +47,6 @@ public interface LikeV1ApiSpec {
             )
     })
     ApiResponse<Void> removeLike(
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @Parameter(description = "상품 ID", required = true)
             @PathVariable Long productId
     );
@@ -69,8 +64,5 @@ public interface LikeV1ApiSpec {
                     content = @Content(schema = @Schema(implementation = ApiResponse.class))
             )
     })
-    ApiResponse<List<LikeV1Dto.LikeItemResponse>> getMyLikes(
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader(value = "X-USER-ID", required = false) String userId
-    );
+    ApiResponse<List<LikeV1Dto.LikeItemResponse>> getMyLikes();
 }

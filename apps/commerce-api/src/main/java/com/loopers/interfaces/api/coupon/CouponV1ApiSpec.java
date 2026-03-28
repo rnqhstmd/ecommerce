@@ -8,7 +8,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestHeader;
 
 @Tag(name = "Coupon API", description = "쿠폰 관리 API")
 public interface CouponV1ApiSpec {
@@ -27,7 +26,7 @@ public interface CouponV1ApiSpec {
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401",
-                    description = "인증 실패 (X-USER-ID 누락)",
+                    description = "인증 실패",
                     content = @Content(schema = @Schema(implementation = ApiResponse.class))
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -38,8 +37,6 @@ public interface CouponV1ApiSpec {
     })
     ApiResponse<CouponV1Dto.CouponIssueResponse> issueCoupon(
             @Parameter(description = "쿠폰 정책 ID", required = true)
-            @PathVariable Long id,
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader(value = "X-USER-ID", required = false) String userId
+            @PathVariable Long id
     );
 }

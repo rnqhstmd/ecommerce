@@ -8,6 +8,7 @@ import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.common.CursorPageRequest;
 import com.loopers.interfaces.api.common.CursorPageResponse;
 import com.loopers.interfaces.api.common.PageResponse;
+import com.loopers.support.auth.SecurityContextHelper;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.validation.Valid;
@@ -27,11 +28,9 @@ public class OrderV1Controller implements OrderV1ApiSpec {
     @PostMapping
     @Override
     public ApiResponse<OrderV1Dto.OrderResponse> placeOrder(
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @RequestBody @Valid OrderV1Dto.PlaceOrderRequest request
     ) {
-        validateUserId(userId);
-
+        String userId = SecurityContextHelper.getCurrentUserId();
         OrderPlaceCommand command = request.toCommand(userId);
         OrderInfo orderInfo = orderFacade.placeOrder(command);
         return ApiResponse.success(OrderV1Dto.OrderResponse.from(orderInfo));
@@ -40,10 +39,9 @@ public class OrderV1Controller implements OrderV1ApiSpec {
     @PostMapping("/{id}/cancel")
     @Override
     public ApiResponse<OrderV1Dto.CancelResponse> cancelOrder(
-            @PathVariable Long id,
-            @RequestHeader(value = "X-USER-ID", required = false) String userId
+            @PathVariable Long id
     ) {
-        validateUserId(userId);
+        String userId = SecurityContextHelper.getCurrentUserId();
         OrderInfo.CancelInfo info = orderFacade.cancelOrder(id, userId);
         return ApiResponse.success(OrderV1Dto.CancelResponse.from(info));
     }
@@ -51,12 +49,11 @@ public class OrderV1Controller implements OrderV1ApiSpec {
     @GetMapping
     @Override
     public ApiResponse<PageResponse<OrderV1Dto.OrderSummaryResponse>> getOrders(
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        validateUserId(userId);
+        String userId = SecurityContextHelper.getCurrentUserId();
         if (page < 0 || size < 1 || size > 100) {
             throw new CoreException(ErrorType.BAD_REQUEST, "page는 0 이상, size는 1 이상 100 이하여야 합니다.");
         }
@@ -71,10 +68,9 @@ public class OrderV1Controller implements OrderV1ApiSpec {
     @GetMapping("/cursor")
     @Override
     public ApiResponse<CursorPageResponse<OrderV1Dto.OrderSummaryResponse>> getOrdersWithCursor(
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @Valid @ModelAttribute CursorPageRequest cursorPageRequest
     ) {
-        validateUserId(userId);
+        String userId = SecurityContextHelper.getCurrentUserId();
 
         List<OrderInfo.OrderSummaryInfo> summaries = orderFacade.getMyOrdersWithCursor(userId, cursorPageRequest.cursor(), cursorPageRequest.size());
         CursorPageResponse<OrderV1Dto.OrderSummaryResponse> response = CursorPageResponse.of(
@@ -88,18 +84,11 @@ public class OrderV1Controller implements OrderV1ApiSpec {
     @GetMapping("/{id}")
     @Override
     public ApiResponse<OrderV1Dto.OrderResponse> getOrderDetail(
-            @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @PathVariable Long id
     ) {
-        validateUserId(userId);
+        String userId = SecurityContextHelper.getCurrentUserId();
         OrderInfo orderInfo = orderFacade.getOrderDetail(id, userId);
         return ApiResponse.success(OrderV1Dto.OrderResponse.from(orderInfo));
-    }
-
-    private void validateUserId(String userId) {
-        if (userId == null || userId.isBlank()) {
-            throw new CoreException(ErrorType.UNAUTHORIZED, "X-USER-ID 헤더는 필수입니다.");
-        }
     }
 
     private OrderStatus parseOrderStatus(String status) {

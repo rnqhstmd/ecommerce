@@ -9,7 +9,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 
 @Tag(name = "User API", description = "사용자 관리 API")
 public interface UserV1ApiSpec {
@@ -42,7 +41,7 @@ public interface UserV1ApiSpec {
 
     @Operation(
             summary = "내 정보 조회",
-            description = "헤더의 사용자 ID로 사용자 정보를 조회합니다."
+            description = "JWT 토큰으로 인증된 사용자 정보를 조회합니다."
     )
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -57,12 +56,5 @@ public interface UserV1ApiSpec {
             )
     })
     @GetMapping("/me")
-    ApiResponse<UserV1Dto.UserResponse> getMyInfo(
-            @Parameter(
-                    name = "X-USER-ID",
-                    description = "사용자 ID",
-                    required = true
-            )
-            @RequestHeader("X-USER-ID") String userId
-    );
+    ApiResponse<UserV1Dto.UserResponse> getMyInfo();
 }

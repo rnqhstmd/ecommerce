@@ -1,8 +1,11 @@
 package com.loopers.interfaces.api.brand;
 
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.support.TestAuthHelper;
+import com.loopers.support.auth.JwtTokenProvider;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,16 +26,30 @@ class BrandV1ApiE2ETest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
+    private String adminToken;
+
+    @BeforeEach
+    void setUp() {
+        adminToken = TestAuthHelper.signupAndGetAdminToken(
+                testRestTemplate, jwtTokenProvider,
+                "brandadmin", "brandadmin@example.com", "password123"
+        );
+    }
+
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
     }
 
-    @DisplayName("POST /api/v1/brands - 브랜드 생성에 성공한다.")
+    @DisplayName("POST /api/v1/brands - ADMIN이 브랜드 생성에 성공한다.")
     @Test
     void createBrand_success() {
         // arrange
         BrandV1Dto.CreateRequest request = new BrandV1Dto.CreateRequest("New Brand");
+        HttpHeaders headers = TestAuthHelper.authHeaders(adminToken);
 
         // act
         ParameterizedTypeReference<ApiResponse<BrandV1Dto.BrandResponse>> responseType =
@@ -41,7 +58,7 @@ class BrandV1ApiE2ETest {
                 testRestTemplate.exchange(
                         "/api/v1/brands",
                         HttpMethod.POST,
-                        new HttpEntity<>(request),
+                        new HttpEntity<>(request, headers),
                         responseType
                 );
 
@@ -60,6 +77,7 @@ class BrandV1ApiE2ETest {
     void createBrand_returnsBadRequest_whenNameIsBlank() {
         // arrange
         BrandV1Dto.CreateRequest request = new BrandV1Dto.CreateRequest("");
+        HttpHeaders headers = TestAuthHelper.authHeaders(adminToken);
 
         // act
         ParameterizedTypeReference<ApiResponse<BrandV1Dto.BrandResponse>> responseType =
@@ -68,7 +86,7 @@ class BrandV1ApiE2ETest {
                 testRestTemplate.exchange(
                         "/api/v1/brands",
                         HttpMethod.POST,
-                        new HttpEntity<>(request),
+                        new HttpEntity<>(request, headers),
                         responseType
                 );
 
@@ -81,16 +99,17 @@ class BrandV1ApiE2ETest {
     void getBrand_success() {
         // arrange - 먼저 브랜드 생성
         BrandV1Dto.CreateRequest request = new BrandV1Dto.CreateRequest("Detail Brand");
+        HttpHeaders headers = TestAuthHelper.authHeaders(adminToken);
         ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> createResponse =
                 testRestTemplate.exchange(
                         "/api/v1/brands",
                         HttpMethod.POST,
-                        new HttpEntity<>(request),
+                        new HttpEntity<>(request, headers),
                         new ParameterizedTypeReference<>() {}
                 );
         Long brandId = createResponse.getBody().data().id();
 
-        // act
+        // act (public endpoint - no auth needed)
         ResponseEntity<ApiResponse<BrandV1Dto.BrandResponse>> response =
                 testRestTemplate.exchange(
                         "/api/v1/brands/" + brandId,

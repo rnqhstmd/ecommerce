@@ -2,15 +2,15 @@ package com.loopers.interfaces.api.product;
 
 import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandRepository;
-import com.loopers.domain.like.LikeService;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
-import com.loopers.domain.user.Gender;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.like.LikeV1Dto;
-import com.loopers.interfaces.api.user.UserV1Dto;
+import com.loopers.support.TestAuthHelper;
+import com.loopers.support.auth.JwtTokenProvider;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +41,25 @@ class ProductV1ApiE2ETest {
     @Autowired
     private RedisTemplate<String, String> redisTemplate;
 
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
+    private String adminToken;
+    private String userToken;
+
+    @BeforeEach
+    void setUp() {
+        // ADMIN 사용자 생성
+        adminToken = TestAuthHelper.signupAndGetAdminToken(
+                testRestTemplate, jwtTokenProvider,
+                "adminuser", "admin@example.com", "password123"
+        );
+        // 일반 사용자 생성 (좋아요 테스트용)
+        userToken = TestAuthHelper.signupAndGetToken(
+                testRestTemplate, "produser01", "plike@example.com", "password123"
+        );
+    }
+
     @AfterEach
     void tearDown() {
         // 인기 상품 캐시 초기화
@@ -48,7 +67,7 @@ class ProductV1ApiE2ETest {
         databaseCleanUp.truncateAllTables();
     }
 
-    @DisplayName("POST /api/v1/products - 상품 생성에 성공한다.")
+    @DisplayName("POST /api/v1/products - ADMIN이 상품 생성에 성공한다.")
     @Test
     void createProduct_success() {
         // arrange
@@ -56,6 +75,7 @@ class ProductV1ApiE2ETest {
         ProductV1Dto.CreateRequest request = new ProductV1Dto.CreateRequest(
                 "Test Product", 10000L, 100, brand.getId()
         );
+        HttpHeaders headers = TestAuthHelper.authHeaders(adminToken);
 
         // act
         ParameterizedTypeReference<ApiResponse<ProductV1Dto.ProductResponse>> responseType =
@@ -64,7 +84,7 @@ class ProductV1ApiE2ETest {
                 testRestTemplate.exchange(
                         "/api/v1/products",
                         HttpMethod.POST,
-                        new HttpEntity<>(request),
+                        new HttpEntity<>(request, headers),
                         responseType
                 );
 
@@ -80,31 +100,42 @@ class ProductV1ApiE2ETest {
         );
     }
 
-    @DisplayName("GET /api/v1/products/{id} - 상품 상세 조회에 성공한다.")
+    @DisplayName("POST /api/v1/products - USER 역할이면 403을 반환한다.")
+    @Test
+    void createProduct_returnsForbidden_whenUserRole() {
+        // arrange
+        Brand brand = brandRepository.save(Brand.create("Test Brand"));
+        ProductV1Dto.CreateRequest request = new ProductV1Dto.CreateRequest(
+                "Test Product", 10000L, 100, brand.getId()
+        );
+        HttpHeaders headers = TestAuthHelper.authHeaders(userToken);
+
+        // act
+        ResponseEntity<ApiResponse<Object>> response =
+                testRestTemplate.exchange(
+                        "/api/v1/products",
+                        HttpMethod.POST,
+                        new HttpEntity<>(request, headers),
+                        new ParameterizedTypeReference<>() {}
+                );
+
+        // assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @DisplayName("GET /api/v1/products/{id} - 상품 상세 조회에 성공한다. (비인증)")
     @Test
     void getProduct_success() {
         // arrange
         Brand brand = brandRepository.save(Brand.create("Test Brand"));
-        ProductV1Dto.CreateRequest createRequest = new ProductV1Dto.CreateRequest(
-                "Detail Product", 5000L, 50, brand.getId()
-        );
-        ParameterizedTypeReference<ApiResponse<ProductV1Dto.ProductResponse>> createType =
-                new ParameterizedTypeReference<>() {};
-        ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> createResponse =
-                testRestTemplate.exchange(
-                        "/api/v1/products",
-                        HttpMethod.POST,
-                        new HttpEntity<>(createRequest),
-                        createType
-                );
-        Long productId = createResponse.getBody().data().productId();
+        Product product = productRepository.save(Product.create("Detail Product", 5000L, 50, brand.getId()));
 
         // act
         ParameterizedTypeReference<ApiResponse<ProductV1Dto.ProductResponse>> responseType =
                 new ParameterizedTypeReference<>() {};
         ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> response =
                 testRestTemplate.exchange(
-                        "/api/v1/products/" + productId,
+                        "/api/v1/products/" + product.getId(),
                         HttpMethod.GET,
                         null,
                         responseType
@@ -287,23 +318,16 @@ class ProductV1ApiE2ETest {
         );
     }
 
-    @DisplayName("GET /api/v1/products/{id} + X-USER-ID - 좋아요 여부가 반영된다.")
+    @DisplayName("GET /api/v1/products/{id} + JWT 토큰 - 좋아요 여부가 반영된다.")
     @Test
     void getProduct_isLikedReflected_whenLoggedIn() {
-        // arrange - 사용자 생성
-        UserV1Dto.RegisterRequest registerRequest = new UserV1Dto.RegisterRequest(
-                "productlikeuser", "plike@example.com", "1990-01-01", Gender.MALE
-        );
-        testRestTemplate.postForEntity("/api/v1/users", registerRequest, ApiResponse.class);
-
+        // arrange
         Brand brand = brandRepository.save(Brand.create("Like Brand"));
         Product product1 = productRepository.save(Product.create("Liked Product", 1000L, 10, brand.getId()));
         Product product2 = productRepository.save(Product.create("Not Liked Product", 2000L, 10, brand.getId()));
 
         // 좋아요 등록
-        HttpHeaders likeHeaders = new HttpHeaders();
-        likeHeaders.set("X-USER-ID", "productlikeuser");
-        likeHeaders.setContentType(MediaType.APPLICATION_JSON);
+        HttpHeaders likeHeaders = TestAuthHelper.authJsonHeaders(userToken);
         LikeV1Dto.LikeRequest likeRequest = new LikeV1Dto.LikeRequest(product1.getId());
         testRestTemplate.exchange(
                 "/api/v1/likes",
@@ -312,8 +336,7 @@ class ProductV1ApiE2ETest {
                 new ParameterizedTypeReference<ApiResponse<LikeV1Dto.LikeResponse>>() {}
         );
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-USER-ID", "productlikeuser");
+        HttpHeaders headers = TestAuthHelper.authHeaders(userToken);
 
         // act - 좋아요한 상품 조회
         ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> likedResponse =
@@ -342,7 +365,7 @@ class ProductV1ApiE2ETest {
         );
     }
 
-    @DisplayName("PUT /api/v1/products/{id} - 상품 수정에 성공한다.")
+    @DisplayName("PUT /api/v1/products/{id} - ADMIN이 상품 수정에 성공한다.")
     @Test
     void updateProduct_success() {
         // arrange
@@ -350,13 +373,14 @@ class ProductV1ApiE2ETest {
         Product product = productRepository.save(Product.create("Before Update", 10000L, 50, brand.getId()));
 
         ProductV1Dto.UpdateRequest request = new ProductV1Dto.UpdateRequest("After Update", 20000L);
+        HttpHeaders headers = TestAuthHelper.authHeaders(adminToken);
 
         // act
         ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> response =
                 testRestTemplate.exchange(
                         "/api/v1/products/" + product.getId(),
                         HttpMethod.PUT,
-                        new HttpEntity<>(request),
+                        new HttpEntity<>(request, headers),
                         new ParameterizedTypeReference<>() {}
                 );
 
@@ -374,13 +398,14 @@ class ProductV1ApiE2ETest {
     void updateProduct_returnsNotFound_whenProductNotExists() {
         // arrange
         ProductV1Dto.UpdateRequest request = new ProductV1Dto.UpdateRequest("New Name", 5000L);
+        HttpHeaders headers = TestAuthHelper.authHeaders(adminToken);
 
         // act
         ResponseEntity<ApiResponse<Object>> response =
                 testRestTemplate.exchange(
                         "/api/v1/products/99999",
                         HttpMethod.PUT,
-                        new HttpEntity<>(request),
+                        new HttpEntity<>(request, headers),
                         new ParameterizedTypeReference<>() {}
                 );
 
@@ -388,7 +413,7 @@ class ProductV1ApiE2ETest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
-    @DisplayName("POST /api/v1/products/{id}/stock - 재고 입고에 성공한다.")
+    @DisplayName("POST /api/v1/products/{id}/stock - ADMIN이 재고 입고에 성공한다.")
     @Test
     void increaseStock_success() {
         // arrange
@@ -396,13 +421,14 @@ class ProductV1ApiE2ETest {
         Product product = productRepository.save(Product.create("Stock Product", 5000L, 50, brand.getId()));
 
         ProductV1Dto.StockRequest request = new ProductV1Dto.StockRequest(30);
+        HttpHeaders headers = TestAuthHelper.authHeaders(adminToken);
 
         // act
         ResponseEntity<ApiResponse<ProductV1Dto.StockResponse>> response =
                 testRestTemplate.exchange(
                         "/api/v1/products/" + product.getId() + "/stock",
                         HttpMethod.POST,
-                        new HttpEntity<>(request),
+                        new HttpEntity<>(request, headers),
                         new ParameterizedTypeReference<>() {}
                 );
 
@@ -420,13 +446,14 @@ class ProductV1ApiE2ETest {
     void increaseStock_returnsNotFound_whenProductNotExists() {
         // arrange
         ProductV1Dto.StockRequest request = new ProductV1Dto.StockRequest(10);
+        HttpHeaders headers = TestAuthHelper.authHeaders(adminToken);
 
         // act
         ResponseEntity<ApiResponse<Object>> response =
                 testRestTemplate.exchange(
                         "/api/v1/products/99999/stock",
                         HttpMethod.POST,
-                        new HttpEntity<>(request),
+                        new HttpEntity<>(request, headers),
                         new ParameterizedTypeReference<>() {}
                 );
 
@@ -443,7 +470,7 @@ class ProductV1ApiE2ETest {
         Product product2 = productRepository.save(Product.create("Popular Product 2", 2000L, 10, brand.getId()));
         Product product3 = productRepository.save(Product.create("Popular Product 3", 3000L, 10, brand.getId()));
 
-        // 좋아요 수 설정 (직접 DB에 likeCount 설정)
+        // 좋아요 수 설정
         product1.increaseLikeCount();
         product1.increaseLikeCount();
         product1.increaseLikeCount();
