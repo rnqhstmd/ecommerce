@@ -1,6 +1,7 @@
 package com.loopers.support.auth;
 
 import com.loopers.domain.user.Role;
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,8 +33,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = resolveToken(request);
 
         if (token != null && jwtTokenProvider.validateToken(token)) {
-            String userId = jwtTokenProvider.getUserId(token);
-            Role role = jwtTokenProvider.getRole(token);
+            Claims claims = jwtTokenProvider.parseClaims(token);
+            String userId = claims.getSubject();
+            String roleClaim = claims.get("role", String.class);
+            Role role = roleClaim != null ? Role.valueOf(roleClaim) : Role.USER;
 
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(

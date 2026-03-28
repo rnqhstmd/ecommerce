@@ -1,7 +1,9 @@
 package com.loopers.interfaces.api.auth;
 
 import com.loopers.application.auth.AuthInfo;
+import com.loopers.domain.user.Gender;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 
 public class AuthV1Dto {
@@ -19,8 +21,8 @@ public class AuthV1Dto {
             @Pattern(regexp = "^\\d{4}-\\d{2}-\\d{2}$", message = "생년월일은 yyyy-MM-dd 형식이어야 합니다.")
             String birthDate,
 
-            @NotBlank(message = "성별은 필수입니다.")
-            String gender,
+            @NotNull(message = "성별은 필수입니다.")
+            Gender gender,
 
             @NotBlank(message = "비밀번호는 필수입니다.")
             String password

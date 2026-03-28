@@ -1,11 +1,13 @@
 package com.loopers.application.auth;
 
+import com.loopers.domain.user.Gender;
 import com.loopers.domain.user.User;
 import com.loopers.domain.user.UserRepository;
 import com.loopers.domain.user.UserService;
 import com.loopers.support.auth.JwtTokenProvider;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,17 +29,10 @@ public class AuthFacade {
     private final RedisTemplate<String, String> redisTemplate;
 
     @Transactional
-    public AuthInfo signup(String userId, String email, String birthDate, String gender, String password) {
+    public AuthInfo signup(String userId, String email, String birthDate, Gender gender, String password) {
         String encodedPassword = passwordEncoder.encode(password);
 
-        com.loopers.domain.user.Gender genderEnum;
-        try {
-            genderEnum = com.loopers.domain.user.Gender.valueOf(gender);
-        } catch (IllegalArgumentException e) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "유효하지 않은 성별입니다.");
-        }
-
-        User user = userService.signUpWithPassword(userId, email, birthDate, genderEnum, encodedPassword);
+        User user = userService.signUpWithPassword(userId, email, birthDate, gender, encodedPassword);
 
         String accessToken = jwtTokenProvider.createAccessToken(user.getUserIdValue(), user.getRole());
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getUserIdValue());
@@ -64,11 +59,14 @@ public class AuthFacade {
     }
 
     public AuthInfo refresh(String refreshToken) {
-        if (!jwtTokenProvider.validateToken(refreshToken)) {
+        Claims claims;
+        try {
+            claims = jwtTokenProvider.parseClaims(refreshToken);
+        } catch (Exception e) {
             throw new CoreException(ErrorType.UNAUTHORIZED, "유효하지 않은 리프레시 토큰입니다.");
         }
 
-        String userId = jwtTokenProvider.getUserId(refreshToken);
+        String userId = claims.getSubject();
         String storedToken = redisTemplate.opsForValue().get(REFRESH_TOKEN_PREFIX + userId);
 
         if (storedToken == null || !storedToken.equals(refreshToken)) {

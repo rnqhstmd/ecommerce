@@ -18,7 +18,7 @@ public final class TestAuthHelper {
      */
     public static String signupAndGetToken(TestRestTemplate restTemplate, String userId, String email, String password) {
         AuthV1Dto.SignupRequest request = new AuthV1Dto.SignupRequest(
-                userId, email, "1990-01-01", "MALE", password
+                userId, email, "1990-01-01", com.loopers.domain.user.Gender.MALE, password
         );
 
         ResponseEntity<ApiResponse<AuthV1Dto.AuthResponse>> response =
@@ -44,7 +44,7 @@ public final class TestAuthHelper {
                                                  String userId, String email, String password) {
         // 먼저 일반 회원가입
         AuthV1Dto.SignupRequest request = new AuthV1Dto.SignupRequest(
-                userId, email, "1990-01-01", "MALE", password
+                userId, email, "1990-01-01", com.loopers.domain.user.Gender.MALE, password
         );
 
         restTemplate.exchange(

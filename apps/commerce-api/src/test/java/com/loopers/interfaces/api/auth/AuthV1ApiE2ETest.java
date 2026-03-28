@@ -1,5 +1,6 @@
 package com.loopers.interfaces.api.auth;
 
+import com.loopers.domain.user.Gender;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.support.TestAuthHelper;
 import com.loopers.utils.DatabaseCleanUp;
@@ -34,7 +35,7 @@ class AuthV1ApiE2ETest {
     void signup_success() {
         // arrange
         AuthV1Dto.SignupRequest request = new AuthV1Dto.SignupRequest(
-                "newuser01", "new@example.com", "1990-01-01", "MALE", "password123"
+                "newuser01", "new@example.com", "1990-01-01", Gender.MALE, "password123"
         );
 
         // act
@@ -62,7 +63,7 @@ class AuthV1ApiE2ETest {
     void signup_returnsConflict_whenUserIdDuplicated() {
         // arrange - 첫 번째 가입
         AuthV1Dto.SignupRequest firstRequest = new AuthV1Dto.SignupRequest(
-                "dupuser01", "dup1@example.com", "1990-01-01", "MALE", "password123"
+                "dupuser01", "dup1@example.com", "1990-01-01", Gender.MALE, "password123"
         );
         testRestTemplate.exchange(
                 "/api/v1/auth/signup",
@@ -73,7 +74,7 @@ class AuthV1ApiE2ETest {
 
         // 두 번째 가입 (같은 userId)
         AuthV1Dto.SignupRequest secondRequest = new AuthV1Dto.SignupRequest(
-                "dupuser01", "dup2@example.com", "1995-05-05", "FEMALE", "password456"
+                "dupuser01", "dup2@example.com", "1995-05-05", Gender.FEMALE, "password456"
         );
 
         // act
@@ -94,7 +95,7 @@ class AuthV1ApiE2ETest {
     void login_success() {
         // arrange - 회원가입
         AuthV1Dto.SignupRequest signupRequest = new AuthV1Dto.SignupRequest(
-                "loginuser", "login@example.com", "1990-01-01", "MALE", "password123"
+                "loginuser", "login@example.com", "1990-01-01", Gender.MALE, "password123"
         );
         testRestTemplate.exchange(
                 "/api/v1/auth/signup",
@@ -128,7 +129,7 @@ class AuthV1ApiE2ETest {
     void login_returnsUnauthorized_whenPasswordIsWrong() {
         // arrange - 회원가입
         AuthV1Dto.SignupRequest signupRequest = new AuthV1Dto.SignupRequest(
-                "wrongpw", "wrong@example.com", "1990-01-01", "MALE", "password123"
+                "wrongpw", "wrong@example.com", "1990-01-01", Gender.MALE, "password123"
         );
         testRestTemplate.exchange(
                 "/api/v1/auth/signup",
@@ -156,7 +157,7 @@ class AuthV1ApiE2ETest {
     void refresh_success() {
         // arrange - 회원가입하여 refreshToken 획득
         AuthV1Dto.SignupRequest signupRequest = new AuthV1Dto.SignupRequest(
-                "refresh01", "refresh@example.com", "1990-01-01", "MALE", "password123"
+                "refresh01", "refresh@example.com", "1990-01-01", Gender.MALE, "password123"
         );
         ResponseEntity<ApiResponse<AuthV1Dto.AuthResponse>> signupResponse =
                 testRestTemplate.exchange(

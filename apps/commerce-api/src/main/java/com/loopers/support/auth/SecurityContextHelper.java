@@ -16,4 +16,15 @@ public final class SecurityContextHelper {
         }
         return (String) authentication.getPrincipal();
     }
+
+    public static String getCurrentUserIdOrNull() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null
+                && authentication.isAuthenticated()
+                && authentication.getPrincipal() instanceof String userId
+                && !"anonymousUser".equals(userId)) {
+            return userId;
+        }
+        return null;
+    }
 }

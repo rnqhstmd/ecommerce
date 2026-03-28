@@ -10,8 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,7 +37,7 @@ public class ProductV1Controller implements ProductV1ApiSpec {
     public ApiResponse<ProductV1Dto.ProductResponse> getProduct(
             @PathVariable Long productId
     ) {
-        String userId = getCurrentUserIdOrNull();
+        String userId = SecurityContextHelper.getCurrentUserIdOrNull();
         ProductDetailInfo info = productFacade.getProductDetail(productId, userId);
         return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
     }
@@ -117,7 +115,7 @@ public class ProductV1Controller implements ProductV1ApiSpec {
             throw new CoreException(ErrorType.BAD_REQUEST, "minPrice는 maxPrice보다 클 수 없습니다.");
         }
 
-        String userId = getCurrentUserIdOrNull();
+        String userId = SecurityContextHelper.getCurrentUserIdOrNull();
         Sort sortOrder = parseSort(sort);
         Pageable pageable = PageRequest.of(page, size, sortOrder);
         ProductGetListCommand command = new ProductGetListCommand(
@@ -137,14 +135,4 @@ public class ProductV1Controller implements ProductV1ApiSpec {
         };
     }
 
-    private String getCurrentUserIdOrNull() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null
-                && authentication.isAuthenticated()
-                && authentication.getPrincipal() instanceof String userId
-                && !"anonymousUser".equals(userId)) {
-            return userId;
-        }
-        return null;
-    }
 }

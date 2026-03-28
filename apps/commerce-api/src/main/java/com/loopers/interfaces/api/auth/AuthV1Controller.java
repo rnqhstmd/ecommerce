@@ -20,8 +20,8 @@ public class AuthV1Controller {
     ) {
         AuthInfo info = authFacade.signup(
                 request.userId(), request.email(), request.birthDate(),
-                request.gender(), request.password()
-        );
+                request.gender(), request.password());
+
         return ApiResponse.success(AuthV1Dto.AuthResponse.from(info));
     }
 

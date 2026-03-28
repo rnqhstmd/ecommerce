@@ -43,7 +43,7 @@ class UserV1ApiE2ETest {
     @Nested
     class SignUp {
 
-        @DisplayName("회원 가입이 성공할 경우, 생성된 유저 정보를 응답으로 반환한다.")
+        @DisplayName("회원 가입 후 내 정보 조회에 성공할 경우, 가입한 유저 정보를 응답으로 반환한다.")
         @Test
         void returnsUserInfo_whenSignUpIsSuccessful() {
             // arrange - auth API로 회원가입하여 토큰 발급
@@ -113,7 +113,7 @@ class UserV1ApiE2ETest {
                     "invalid-id!",
                     "test@example.com",
                     "1990-01-01",
-                    "MALE",
+                    Gender.MALE,
                     "password123"
             );
 
@@ -146,7 +146,7 @@ class UserV1ApiE2ETest {
                     "testuser01",
                     "another@example.com",
                     "1995-05-05",
-                    "FEMALE",
+                    Gender.FEMALE,
                     "password456"
             );
 

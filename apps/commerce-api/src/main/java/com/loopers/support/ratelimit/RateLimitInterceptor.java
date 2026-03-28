@@ -61,7 +61,10 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private String resolveIdentifier(HttpServletRequest request) {
         // JWT 인증된 사용자는 SecurityContext에서 userId 추출
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getPrincipal() instanceof String userId) {
+        if (authentication != null
+                && authentication.isAuthenticated()
+                && authentication.getPrincipal() instanceof String userId
+                && !"anonymousUser".equals(userId)) {
             return "user:" + userId;
         }
         // IP 폴백: X-Forwarded-For는 클라이언트가 조작 가능하므로 remoteAddr만 사용

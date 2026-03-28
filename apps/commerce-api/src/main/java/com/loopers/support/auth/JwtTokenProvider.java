@@ -65,11 +65,11 @@ public class JwtTokenProvider {
     }
 
     public String getUserId(String token) {
-        return getClaims(token).getSubject();
+        return parseClaims(token).getSubject();
     }
 
     public Role getRole(String token) {
-        String role = getClaims(token).get("role", String.class);
+        String role = parseClaims(token).get("role", String.class);
         return role != null ? Role.valueOf(role) : Role.USER;
     }
 
@@ -77,7 +77,7 @@ public class JwtTokenProvider {
         return refreshExpiration;
     }
 
-    private Claims getClaims(String token) {
+    public Claims parseClaims(String token) {
         return Jwts.parser()
                 .verifyWith(secretKey)
                 .build()
