@@ -1,548 +1,559 @@
-# ecommerce 영역별 개선 전후 분석
-
-> 각 Phase를 진행하면서 왜 이런 개선이 필요했고, 이전에는 어떤 문제가 있었고, 어떻게 풀었는지를 정리했습니다.
+# Phase 7: Elasticsearch 검색 시스템 도입 — 개선 분석 보고서
 
 - 작성일: 2026-03-29
+- 관련 PR: #12
 
 ---
 
-## 1. 동시성 제어
+## 1. 도입 배경
 
-### 1-1. 재고 차감 — 비관적 락 + 데드락 방지
+### 1-1. 기존 검색 시스템의 기술적 한계
 
-Week 2 초기에는 `Product.decreaseStock(quantity)`를 그냥 호출하는 방식이었습니다. 동시에 여러 주문이 같은 상품을 사면 lost update가 생길 수 있었습니다.
-
-```
-Thread A: read stock=10 → decrease → stock=8
-Thread B: read stock=10 → decrease → stock=7
-결과: 실제로 5개가 빠져야 하는데 stock=7 (3개 유실)
-```
-
-두 트랜잭션이 같은 row를 동시에 읽으면, 나중에 커밋하는 쪽이 먼저 커밋한 변경을 덮어쓰는 게 문제였습니다. 거기에 복수 상품을 동시에 락 잡을 때도, 주문 A가 상품 [1, 2], 주문 B가 상품 [2, 1] 순서로 락을 잡으면 데드락이 걸렸습니다.
-
-`StockDeductionService`에서 비관적 락(PESSIMISTIC_WRITE)과 ID 오름차순 정렬 조합으로 해결했습니다.
+기존 검색은 `ProductQueryRepository`에서 QueryDSL + MySQL `LIKE` 쿼리로 구현되어 있었다.
 
 ```java
-// ProductJpaRepository
-@Lock(LockModeType.PESSIMISTIC_WRITE)
-@Query("SELECT p FROM Product p WHERE p.id IN :ids ORDER BY p.id ASC")
-List<Product> findAllByIdsWithLock(@Param("ids") List<Long> ids);
+// 기존 ProductQueryRepository.java
+builder.and(product.name.containsIgnoreCase(condition.keyword().trim()));
 ```
 
-```java
-// StockDeductionService — Propagation.MANDATORY로 반드시 기존 트랜잭션 내에서 실행
-List<Long> sortedProductIds = commands.stream()
-        .map(StockDeductionCommand::productId)
-        .sorted()  // 데드락 방지: 항상 같은 순서로 락 획득
-        .toList();
-List<Product> products = productService.getProductsByIdsWithLock(sortedProductIds);
-```
+이 한 줄은 다음 문제들의 근원이다.
 
-`SELECT ... FOR UPDATE`로 DB 레벨에서 동시 읽기를 막고, `ORDER BY p.id ASC`로 모든 트랜잭션이 같은 순서로 락을 잡게 했습니다. `Propagation.MANDATORY`를 걸어서 이 메서드가 트랜잭션 없이 단독 호출되는 것도 막았습니다.
+**풀 테이블 스캔 (Full Table Scan)**
+
+`LIKE '%keyword%'`는 앞에 와일드카드가 있어 MySQL B-Tree 인덱스를 사용할 수 없다. 상품 수에 비례하여 응답 시간이 선형으로 증가한다. 상품 10만 건 이상에서 수백 ms 수준의 지연이 발생한다.
+
+**COUNT 쿼리 이중 실행**
+
+offset 페이지네이션 구조에서 content 쿼리와 count 쿼리를 매 요청마다 두 번 실행한다. 대량 데이터에서 두 쿼리 모두 풀 스캔을 수행하므로 부하가 두 배가 된다.
+
+**한글 형태소 분석 부재**
+
+MySQL은 한글 형태소 분석을 내장하지 않는다. "운동화를"로 검색하면 `LIKE '%운동화를%'`가 실행되고, 상품명에는 "운동화를"이라는 부분 문자열이 없으므로 0건이 반환된다. 조사("를", "의", "에서", "는")가 붙으면 검색에 실패한다.
+
+**단일 필드 검색**
+
+상품명(`name`) 하나만 검색 대상이었다. "나이키"를 검색해도 `brandName`이 "나이키"인 상품이 상품명에 "나이키"를 포함하지 않으면 누락된다. 카테고리명 검색도 불가능했다.
+
+**관련도 점수(Relevance Score) 없음**
+
+매칭 여부(true/false)만 판단하므로 "나이키 흰색 운동화"를 검색할 때 세 단어 모두 포함된 상품과 한 단어만 포함된 상품을 구분할 수 없다. 결과 품질이 낮다.
+
+**기능 확장 불가**
+
+자동완성, 집계(faceted search), 오타 교정 등 현대적 검색 기능은 MySQL LIKE 구조에서 구현할 수 없다.
+
+### 1-2. 도입 목표
+
+PRD에서 추출한 구체적 목표는 세 가지다.
+
+1. **검색 품질**: Nori 형태소 분석기로 조사 분리, multi_match로 상품명·브랜드명·카테고리명 동시 검색, BM25 관련도 점수 적용
+2. **성능**: 역인덱스(Inverted Index) 기반 토큰 매칭으로 풀 스캔 제거, MySQL을 트랜잭션 전용으로 분리
+3. **기능 확장**: 자동완성(Edge N-gram), 집계(terms + range aggregation), 재인덱싱 배치
 
 ---
 
-### 1-2. 쿠폰 선착순 발급 — 3단계 진화
+## 2. 아키텍처 설계
 
-선착순 쿠폰 발급은 프로젝트에서 가장 여러 번 고친 부분입니다. 총 3단계에 걸쳐 동시성 보호 수준을 올렸습니다.
+### 2-1. 도입 전후 아키텍처 비교
 
-**Phase 4 초기 — hasKey + set (비원자적)**
+**도입 전**
 
-```java
-Boolean hasKey = redisTemplate.hasKey(stockKey);
-if (Boolean.FALSE.equals(hasKey)) {
-    int remaining = policy.getTotalQuantity() - policy.getIssuedQuantity();
-    redisTemplate.opsForValue().set(stockKey, String.valueOf(remaining));  // 비원자적!
-}
-Long remaining = redisTemplate.opsForValue().decrement(stockKey);
+```
+[검색 요청]
+Client
+  └── Controller
+        └── ProductFacade
+              └── ProductService
+                    └── ProductQueryRepository (QueryDSL)
+                          └── MySQL  <-- LIKE '%keyword%' 풀 스캔
 ```
 
-`hasKey` 체크와 `set` 사이에 다른 스레드가 끼어드는 게 문제였습니다. 잔여 수량 3인 상태에서 두 스레드가 동시에 `hasKey=false`를 읽으면, 둘 다 `set(3)`을 실행해서 이미 차감된 수량이 리셋됩니다.
+**도입 후**
 
-**PR #9 리뷰 반영 — setIfAbsent (원자적)**
+```
+[검색 요청]
+Client
+  └── Controller
+        └── ProductFacade
+              └── ProductSearchService
+                    ├── [정상] ProductSearchPort
+                    │     └── ElasticsearchProductSearchAdapter
+                    │           └── Elasticsearch  <-- 역인덱스 조회
+                    │                 │ ID 목록 반환
+                    │           ProductService
+                    │                 └── MySQL  <-- 상세 조회 (by IDs)
+                    └── [Circuit Breaker 발동] ProductRepository
+                                └── MySQL  <-- LIKE fallback
 
-```java
-// Redis에 키가 없으면 원자적으로 초기화 (SETNX)
-redisTemplate.opsForValue().setIfAbsent(stockKey, String.valueOf(remainingStock));
+[CUD 요청]
+Client
+  └── Controller
+        └── ProductFacade
+              ├── ProductService
+              │     └── MySQL  <-- 트랜잭션 처리
+              └── ApplicationEventPublisher
+                    └── [AFTER_COMMIT]
+                          ProductIndexer
+                                └── Elasticsearch  <-- 동기화
 ```
 
-`setIfAbsent`(= Redis SETNX)는 키가 없을 때만 값을 세팅하는 원자적 연산이라, 동시에 여러 스레드가 호출해도 최초 1개만 성공합니다. catch 범위도 `CoreException`에서 `Exception`으로 넓혀서, DB 예외가 나도 Redis 수량이 복구되게 했습니다.
+### 2-2. Port/Adapter 패턴 (레이어 구조)
 
-**Phase 5 (PR #10 리뷰) — Redisson 분산 락 + DB 비관적 락**
+검색 기능은 도메인 레이어에 `ProductSearchPort` 인터페이스를 정의하고, 인프라 레이어에 `ElasticsearchProductSearchAdapter`가 구현하는 Port/Adapter 패턴으로 설계했다.
 
-```java
-// CouponFacade — 3중 보호
-public CouponInfo issueCoupon(Long couponPolicyId, String userId) {
-    String lockKey = COUPON_LOCK_KEY_PREFIX + couponPolicyId;
-    return distributedLockService.executeWithLock(   // 1) Redisson 분산 락
-            lockKey, waitTimeSeconds, leaseTimeSeconds, TimeUnit.SECONDS,
-            () -> doIssueCoupon(couponPolicyId, userId));
-}
+```
+도메인 레이어 (domain/product/)
+  ProductSearchPort                  <-- 인터페이스 (검색 계약 정의)
+    - searchProducts(...)
+    - autocomplete(...)
+    - facets(...)
 
-private CouponInfo doIssueCoupon(Long couponPolicyId, String userId) {
-    return transactionTemplate.execute(status -> {
-        CouponPolicy policy = couponService.getCouponPolicyWithLock(couponPolicyId);  // 2) DB 비관적 락
-        // ... setIfAbsent + DECR ...                                                  // 3) Redis 원자적 연산
-    });
-}
+인프라 레이어 (infrastructure/search/)
+  ElasticsearchProductSearchAdapter  <-- ProductSearchPort 구현체
+  ProductDocument                    <-- ES 문서 매핑
+  ProductSearchRepository            <-- Spring Data ES Repository
+  ProductIndexer                     <-- 동기화 리스너
 ```
 
-왜 3중으로 보호해야 했냐면, 각 계층 하나만으로는 빈틈이 있었기 때문입니다.
+이 설계의 이점은 ES 장애 시 또는 테스트 시 도메인 코드 변경 없이 구현체를 교체할 수 있다는 점이다. Circuit Breaker fallback이 `ProductRepository`(MySQL)로 전환되는 것도 이 인터페이스 덕분에 가능하다.
 
-| 계층 | 역할 | 혼자서는 부족한 이유 |
-|------|------|---------------------|
-| Redisson 분산 락 | 애플리케이션 인스턴스 간 직렬화 | Redis 단일 장애 시 보호 불가 |
-| DB 비관적 락 | `issuedQuantity` lost update 방지 | 분산 환경에서 DB만으로는 Redis 수량과 동기화 불가 |
-| Redis SETNX + DECR | 빠른 수량 소진 판단 | DB 반영 실패 시 Redis와 DB 간 불일치 발생 가능 |
+### 2-3. 데이터 동기화 전략 (Application Event + AFTER_COMMIT)
 
-분산 락이 요청을 직렬화하고, DB 락이 데이터 정합성을 잡고, Redis가 빠른 수량 체크를 맡는 구조입니다.
+MySQL의 상품 CUD 트랜잭션이 커밋된 뒤 ES 인덱스를 갱신한다. `AFTER_COMMIT` 시점을 사용하므로 트랜잭션이 롤백되면 ES 동기화도 발생하지 않는다.
 
----
+```
+[상품 생성 흐름]
 
-### 1-3. DistributedLockService — Redisson 분산 락 서비스
+ProductFacade.createProduct()
+  ├── productService.createProduct()  -- MySQL INSERT (트랜잭션)
+  └── eventPublisher.publishEvent(new ProductCreatedEvent(productId))
 
-Phase 5에서 운영 안정성을 신경 쓰면서, 서버를 여러 대 띄우는 수평 확장 상황을 고려하게 됐습니다. `synchronized`나 DB 락만으로는 JVM이 여러 개일 때 동시성을 못 잡습니다.
+  [트랜잭션 COMMIT 완료]
+       |
+       v  @TransactionalEventListener(phase = AFTER_COMMIT)
+  ProductIndexer.handleProductCreated()
+       ├── productRepository.findById(productId)  -- MySQL 조회
+       ├── brandService.getBrand(brandId)          -- 브랜드명 비정규화
+       ├── categoryService.getById(categoryId)     -- 카테고리명 비정규화
+       └── productSearchRepository.save(document)  -- ES 인덱싱
 
-```java
-public <T> T executeWithLock(String key, long waitTime, long leaseTime, TimeUnit unit, Supplier<T> supplier) {
-    RLock lock = redissonClient.getLock(key);
-    boolean acquired = false;
-    try {
-        acquired = lock.tryLock(waitTime, leaseTime, unit);
-        if (!acquired) {
-            throw new CoreException(ErrorType.CONFLICT, "다른 요청이 처리 중입니다.");
-        }
-        return supplier.get();
-    } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new CoreException(ErrorType.INTERNAL_ERROR, "락 획득 중 인터럽트가 발생했습니다.");
-    } finally {
-        if (acquired && lock.isHeldByCurrentThread()) {
-            lock.unlock();
-        }
-    }
-}
+[상품 삭제 흐름]
+  ProductDeletedEvent --> productSearchRepository.deleteById(productId)
 ```
 
-`tryLock`으로 일정 시간만 대기하고 실패하게 해서 무한 대기를 막았고, `leaseTime`을 줘서 프로세스가 죽어도 락이 자동 해제되게 했습니다. `isHeldByCurrentThread()` 체크는 다른 스레드가 가진 락을 실수로 풀지 않기 위한 안전장치입니다. `waitTime`과 `leaseTime`은 `CouponLockProperties`로 빼서 운영 중에 조정할 수 있게 했습니다.
+동기화 실패 시 `log.error`만 기록하고 상위 트랜잭션을 롤백하지 않는다. 최대 수 초의 지연이 허용되며, 전체 재동기화가 필요할 때는 재인덱싱 배치 API를 사용한다.
 
----
+### 2-4. Circuit Breaker (Resilience4j)
 
-## 2. 캐시 전략
-
-### 2-1. 장바구니 — Redis Hash (TTL 7일)
-
-Phase 3 전에는 장바구니 기능 자체가 없었습니다. 상품을 고르면 바로 주문해야 했습니다.
-
-장바구니는 임시 데이터이고, 수량 변경이 잦고, 사용자별로 독립적입니다. RDB에 넣으면 수량 바꿀 때마다 UPDATE 쿼리가 나가고, 유효기간 관리용 배치도 따로 돌려야 합니다. Redis Hash가 이 세 가지를 자연스럽게 해결해줬습니다.
-
-```java
-// key: cart:{userId}, field: productId, value: quantity
-public long addItem(String userId, Long productId, int quantity) {
-    String key = cartKey(userId);
-    Long result = redisTemplate.opsForHash().increment(key, productId.toString(), quantity);
-    return result != null ? result : quantity;
-}
-```
-
-`HINCRBY`가 원자적 연산이라 동시에 같은 상품을 담아도 수량이 정확합니다. TTL 7일을 줘서 방치된 장바구니는 알아서 정리되고, `checkout` 시에는 기존 `placeOrder` 플로우를 그대로 재사용해서 주문 로직을 건드리지 않았습니다.
-
----
-
-### 2-2. 인기 상품 — Redis Sorted Set
-
-이전에는 인기 상품을 보여주려면 매번 `SELECT ... ORDER BY like_count DESC LIMIT N` 쿼리를 날려야 했습니다. 트래픽이 몰리면 DB 부하가 집중됩니다.
-
-Sorted Set은 score 기반 정렬을 O(log N)으로 해주고, `ZREVRANGE`로 TOP N을 바로 꺼낼 수 있습니다. like_count를 score로 쓰면 정렬이 공짜입니다.
-
-```java
-// 캐시 히트: Sorted Set에서 상위 N개 반환
-Set<ZSetOperations.TypedTuple<String>> cached = redisTemplate.opsForZSet()
-        .reverseRangeWithScores(POPULAR_KEY, 0, limit - 1);
-
-// 캐시 미스: DB 조회 → Sorted Set 적재 → TTL 1시간
-redisTemplate.opsForZSet().add(POPULAR_KEY, tuples);
-redisTemplate.expire(POPULAR_KEY, 1, TimeUnit.HOURS);
-```
-
-TTL은 1시간으로 잡았습니다. 인기 상품은 실시간 정확도보다 DB 부하를 줄이는 게 더 중요하다고 판단했습니다. `@Retry` + fallback을 걸어서 Redis가 죽어도 DB에서 직접 조회하게 했습니다.
-
----
-
-### 2-3. Spring Cache 체계화 — RedisCacheManager
-
-Phase 4까지는 캐시를 `redisTemplate`으로 직접 get/set 하는 방식이었습니다. 캐시 키 관리가 여기저기 흩어져 있고, TTL 설정도 코드 곳곳에 박혀 있어서 관리가 힘들었습니다.
-
-Phase 5에서 Spring Cache 추상화(`@Cacheable`, `@CacheEvict`)를 도입하고, `RedisCacheManager`로 캐시별 TTL을 한 곳에서 관리하게 바꿨습니다.
-
-```java
-Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
-cacheConfigurations.put("product", defaultConfig.entryTtl(Duration.ofMinutes(10)));
-cacheConfigurations.put("brands", defaultConfig.entryTtl(Duration.ofHours(1)));
-```
-
-```java
-// BrandService — 선언적 캐싱
-@Cacheable(value = "brands", key = "#pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort")
-public Page<Brand> getBrands(Pageable pageable) { ... }
-```
-
-비즈니스 로직과 캐시 로직이 분리되니 코드가 깔끔해졌고, TTL 변경도 한 곳만 고치면 됩니다. `@ConditionalOnProperty`로 local/test에서는 캐시를 끄게 해서 테스트 격리도 챙겼습니다.
-
----
-
-### 2-4. 좋아요 수 비정규화 + 캐시 무효화
-
-이전에는 `likeCount`를 매번 `SELECT COUNT(*) FROM likes WHERE product_id = ?`로 계산했습니다. 상품 목록에서 각 상품마다 COUNT 쿼리가 나가는 N+1 문제가 있었습니다.
-
-Product 엔티티에 `likeCount` 필드를 추가해서 비정규화하고, 좋아요 추가/제거 시 원자적으로 업데이트하는 방식으로 바꿨습니다.
-
-```java
-// LikeService
-productRepository.incrementLikeCount(productId);  // UPDATE product SET like_count = like_count + 1
-productService.evictProductCache(productId);       // @CacheEvict
-```
-
-상품 목록 조회는 읽기 빈도가 쓰기보다 압도적으로 높아서, 비정규화의 이점이 큽니다. COUNT 쿼리가 사라지니 목록 응답이 빨라졌고, 캐시 무효화로 비정규화 데이터 정합성도 잡았습니다.
-
----
-
-### 2-5. Rate Limiting — Redis Lua 스크립트
-
-Phase 5 초기에는 INCR과 EXPIRE를 따로 호출했습니다.
-
-```java
-Long count = redisTemplate.opsForValue().increment(key);
-if (count != null && count == 1L) {
-    redisTemplate.expire(key, windowSeconds, TimeUnit.SECONDS);  // 별도 호출!
-}
-```
-
-INCR 후 프로세스가 죽으면 EXPIRE가 안 걸려서 해당 키가 영구적으로 남습니다. 그러면 해당 사용자/IP가 영구 차단되는 셈입니다.
-
-PR #10 리뷰에서 Lua 스크립트로 두 연산을 원자적으로 묶었습니다.
-
-```lua
-local count = redis.call('INCR', KEYS[1])
-if count == 1 then
-  redis.call('EXPIRE', KEYS[1], ARGV[1])
-end
-return count
-```
-
-사용자 식별 방식도 바꿨습니다. 이전에는 `X-Forwarded-For` 헤더를 썼는데, 이건 클라이언트가 조작할 수 있어서 `SecurityContext`의 userId + `remoteAddr` 폴백으로 변경했습니다.
-
----
-
-## 3. 이벤트 시스템 + 복원력
-
-### 3-1. Kafka 이벤트 발행 — AFTER_COMMIT 보장
-
-이전에는 이벤트 없이 동기적으로 후속 작업(알림 발송 등)을 다 처리했습니다. 주문 API 응답 시간에 알림 발송 시간이 포함되고, 알림 발송이 실패하면 주문 자체가 실패하는 문제가 있었습니다.
-
-```java
-@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-@CircuitBreaker(name = "kafkaPublisher", fallbackMethod = "handleOrderPlacedFallback")
-public void handle(OrderPlacedEvent event) {
-    kafkaTemplate.send(TOPIC_ORDER_PLACED, String.valueOf(event.orderId()), event)
-            .get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-}
-```
-
-`AFTER_COMMIT`을 쓴 이유는 명확합니다. 트랜잭션 커밋 전에 Kafka에 이벤트를 보내면, consumer가 이벤트를 받았는데 원본 트랜잭션이 롤백되는 상황이 생깁니다. 존재하지 않는 주문에 대한 알림이 발송되는 거죠. 트랜잭션이 확정된 후에만 이벤트를 발행하게 해서 이 문제를 막았습니다.
-
-CircuitBreaker도 같이 걸었습니다. Kafka 장애 시 이벤트 발행 실패가 반복되면 Circuit이 OPEN되어 빠르게 실패하는데, 이벤트 발행이 트랜잭션 밖이라 주문 자체에는 영향이 없습니다.
-
----
-
-### 3-2. 보상 트랜잭션 — 주문 취소
-
-Week 2에는 주문 취소 기능이 아예 없었습니다. 주문은 생성만 되고 취소할 수 없었습니다.
-
-주문 취소가 까다로운 건, 원복해야 하는 항목이 여러 도메인에 걸쳐 있기 때문입니다. 주문 상태(PAID → CANCELLED), 재고 복구, 포인트 환불, 쿠폰 사용 플래그 복원 — 이 4가지 중 하나라도 빠지면 데이터 불일치가 생깁니다.
-
-```java
-@Transactional
-public OrderInfo.CancelInfo cancelOrder(Long orderId, String userId) {
-    Order order = orderService.getOrderByIdWithLock(orderId);    // 비관적 락
-    order.cancel();                                                // 상태 전이
-    restoreStock(order);                                           // 재고 복구 (ID 정렬 비관적 락)
-    pointService.refundPoint(userId, order.getActualPaymentAmount()); // 포인트 환불
-    if (order.getUserCouponId() != null) {
-        couponService.restoreCoupon(order.getUserCouponId());      // 쿠폰 복원
-    }
-    eventPublisher.publishEvent(OrderCancelledEvent.from(order));  // 이벤트 발행
-    return OrderInfo.CancelInfo.from(order);
-}
-```
-
-단일 `@Transactional` 안에서 모든 보상 작업을 수행해서, 하나라도 실패하면 전체가 롤백됩니다. `getActualPaymentAmount()`로 쿠폰 할인 적용 후 실제 결제 금액만 환불하게 한 것도 신경 쓴 부분입니다. 재고 복구도 ID 오름차순 비관적 락으로 데드락을 방지했습니다.
-
----
-
-### 3-3. Resilience4j — Circuit Breaker + Retry
-
-Phase 5에서 외부 의존성(Kafka, Redis)의 장애 전파를 막기 위해 도입했습니다. 장애 전파를 막지 않으면 Kafka 장애가 이벤트 발행 타임아웃으로 번지고, 그게 주문 API 응답 지연으로, 결국 전체 시스템이 느려지는 상황이 생깁니다. Redis 장애 시 인기 상품 조회가 실패하는 것도 마찬가지인데, 이건 DB로 대체 가능한 기능이라 에러를 보여줄 필요가 없었습니다.
+ES 장애 시 서비스 전체가 중단되지 않도록 Resilience4j Circuit Breaker를 적용했다.
 
 ```yaml
+# application.yml
 resilience4j:
   circuitbreaker:
     instances:
-      kafkaPublisher:
-        sliding-window-size: 10        # 최근 10건 기준
-        failure-rate-threshold: 50      # 50% 실패 시 OPEN
-        wait-duration-in-open-state: 10s # 10초 후 HALF_OPEN
-  retry:
-    instances:
-      redisRetry:
-        max-attempts: 3
-        wait-duration: 500ms
+      elasticsearchSearch:
+        sliding-window-size: 10
+        failure-rate-threshold: 50        # 10건 중 5건 이상 실패 시 개방
+        wait-duration-in-open-state: 10s  # 10초 후 half-open 전환
+        permitted-number-of-calls-in-half-open-state: 3
+        register-health-indicator: true
 ```
 
-| 패턴 | 적용 대상 | 동작 |
-|------|----------|------|
-| Circuit Breaker | Kafka 이벤트 발행 | 연속 실패 시 빠르게 실패, fallback으로 로그만 기록 |
-| Retry | Redis 인기 상품 조회 | 3회 재시도 후 DB 직접 조회로 폴백 |
+Fallback 동작:
+- 검색(`search`): MySQL LIKE 방식으로 전환, 동일한 응답 형식 유지
+- 자동완성(`autocomplete`): 빈 배열 반환
+- 집계(`facets`): 빈 집계 결과 반환
 
 ---
 
-### 3-4. Graceful Shutdown
+## 3. 구현 상세
 
-서버를 재시작할 때 진행 중인 요청이 강제 종료되면, 주문이 중간에 끊기거나 Kafka 메시지가 유실될 수 있습니다.
+### 3-1. 인프라 구성
+
+**커스텀 Docker 이미지 (Nori 플러그인)**
+
+```dockerfile
+# docker/elasticsearch/Dockerfile
+FROM docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+RUN bin/elasticsearch-plugin install analysis-nori
+```
+
+Nori 플러그인을 Dockerfile에서 설치하는 방식을 선택한 이유: CI 환경에서 매번 플러그인을 다운로드하지 않고 이미지를 캐시할 수 있어 재현성과 속도 모두 확보된다.
+
+**Docker Compose 구성 (infra-compose.yml)**
 
 ```yaml
-server:
-  shutdown: graceful                      # 새 요청 수신 중단
-spring:
-  lifecycle:
-    timeout-per-shutdown-phase: 30s       # 진행 중 요청 완료 대기 (최대 30초)
+elasticsearch:
+  build:
+    context: ./elasticsearch
+    dockerfile: Dockerfile
+  container_name: elasticsearch
+  ports:
+    - "127.0.0.1:9200:9200"   # 로컬호스트로만 노출
+  environment:
+    - discovery.type=single-node
+    - xpack.security.enabled=false   # 로컬 환경 한정
+    - ES_JAVA_OPTS=-Xms512m -Xmx512m
+  healthcheck:
+    test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+    interval: 10s
+    timeout: 5s
+    retries: 10
 ```
+
+**Testcontainers 통합 테스트**
+
+기존 `MySqlTestContainersConfig` 패턴을 따라 `ElasticsearchTestContainersConfig`를 `modules/elasticsearch/src/testFixtures`에 구현했다. 동일한 Nori 커스텀 Dockerfile을 사용하므로 로컬과 CI 테스트 환경이 일치한다.
+
+### 3-2. ES 인덱스 설계
+
+`products-index-settings.json`의 주요 설정:
+
+**분석기 구성**
+
+| 분석기 | 사용처 | 동작 |
+|--------|--------|------|
+| `korean` | `name`, `brandName`, `categoryName` | Nori 형태소 분석 + 읽기형 변환 + 소문자화 |
+| `edge_ngram_analyzer` | `name.autocomplete` 인덱싱 | 접두사 방향으로 1~20글자 N-gram 생성 |
+| `edge_ngram_search_analyzer` | `name.autocomplete` 검색 | standard tokenizer (입력을 그대로 사용) |
+
+인덱싱 시와 검색 시 분석기를 다르게 설정한 이유: 인덱싱 시에는 N-gram으로 모든 접두사 토큰을 생성하고, 검색 시에는 입력 키워드를 그대로 사용해야 "나이"라는 입력이 N-gram 분해 없이 "나이"로 검색된다.
+
+**필드 매핑**
+
+| 필드 | 타입 | 분석기 | 서브필드 |
+|------|------|--------|----------|
+| `name` | text | korean | `name.autocomplete` (edge_ngram_analyzer) |
+| `brandName` | text | korean | `brandName.keyword` (keyword, 집계용) |
+| `categoryName` | text | korean | `categoryName.keyword` (keyword, 집계용) |
+| `price` | long | - | 범위 필터, 가격대 집계 |
+| `likeCount` | long | - | 정렬용 |
+| `createdAt` | date | - | 정렬용 |
+| `deletedAt` | date | - | null 여부로 삭제 필터링 |
+
+`max_result_window: 10000`으로 설정하여 offset × size의 최대값을 제한한다. 이를 초과하는 요청은 400을 반환한다.
+
+인덱스 자동 생성: `ElasticsearchConfig`의 `@PostConstruct`에서 `products` 인덱스 존재 여부를 확인하고 없으면 `products-index-settings.json`을 읽어 생성한다.
+
+### 3-3. 검색 쿼리 구현
+
+**키워드 검색 (multi_match)**
 
 ```java
-// RedisHealthIndicator — 로드밸런서가 인스턴스 상태 판단에 사용
-public Health health() {
-    String pong = redisConnectionFactory.getConnection().ping();
-    if ("PONG".equals(pong)) {
-        return Health.up().withDetail("redis", "연결 정상").build();
-    }
-    return Health.down().withDetail("redis", "PING 응답 비정상").build();
-}
+// ElasticsearchProductSearchAdapter.java
+Query.of(q -> q
+    .multiMatch(mm -> mm
+        .query(keyword)
+        .fields("name", "brandName", "categoryName")
+        .type(TextQueryType.BestFields)
+        .tieBreaker(0.3)
+    )
+);
 ```
 
-종료 신호가 오면 새 커넥션 수신을 먼저 중단하고, 진행 중인 요청은 최대 30초까지 완료를 기다립니다. `/actuator/health`가 DOWN을 반환하면 로드밸런서가 트래픽을 차단하고, 모든 요청이 끝나면 안전하게 종료됩니다.
+- `BestFields`: 여러 필드 중 가장 높은 점수를 가진 필드의 점수를 채택
+- `tieBreaker(0.3)`: 나머지 필드 점수의 30%를 합산하여 여러 필드에 매칭되는 문서를 보상
+- keyword가 blank이면 `match_all`로 전환
+
+**필터 구성 (filter context)**
+
+```java
+// deletedAt 없는 문서만 (소프트 삭제되지 않은 상품)
+filters.add(Query.of(f -> f
+    .bool(fb -> fb.mustNot(mn -> mn.exists(e -> e.field("deletedAt"))))
+));
+// brandId, minPrice, maxPrice 조건 추가
+```
+
+filter context를 사용하면 관련도 점수 계산에 영향을 주지 않고, ES의 Filter Cache를 활용할 수 있다.
+
+**자동완성 (match_phrase_prefix)**
+
+```java
+Query.of(q -> q
+    .matchPhrasePrefix(mp -> mp
+        .field("name.autocomplete")
+        .query(prefix)
+    )
+);
+```
+
+**집계 (terms + range aggregation)**
+
+`size(0)`으로 실제 문서를 반환하지 않고 집계 결과만 가져와 네트워크 비용을 최소화한다. 브랜드·카테고리는 `terms` 집계, 가격대는 `range` 집계(4개 고정 구간)를 사용한다.
+
+### 3-4. Two-phase 검색 (ES ID 조회 → MySQL 상세 조회)
+
+`ProductFacade.getProducts()`는 두 단계로 동작한다.
+
+```
+Phase 1: ES에서 ID 목록 + 총 건수 조회
+         productSearchService.search(command)
+         --> ProductSearchResult(productIds, totalHits)
+
+Phase 2: MySQL에서 상세 조회 (ES 결과 순서 보존)
+         productService.findProductsByIds(searchInfo.productIds())
+         --> IN (id1, id2, ...) 조회
+
+순서 보존: ES가 반환한 productIds 순서대로
+         Map<Long, Product>에서 재조립
+         --> 관련도 점수 순서 유지
+```
+
+MySQL `IN (...)` 조회 결과는 순서가 보장되지 않으므로 `Map<Long, Product>`으로 변환 후 ES 순서대로 재조립한다.
+
+### 3-5. 신규 API 엔드포인트
+
+| 메서드 | 경로 | 설명 | 인증 |
+|--------|------|------|------|
+| GET | `/api/v1/products/search/autocomplete` | 자동완성 (keyword, size) | 불필요 |
+| GET | `/api/v1/products/search/facets` | 집계 (keyword, minPrice, maxPrice) | 불필요 |
+| POST | `/api/v1/admin/products/reindex` | 전체 재인덱싱 배치 | ADMIN 전용 |
+
+자동완성 API: `size` 기본값 10, 최대 20. 초과 시 400 반환. 빈 keyword → 빈 배열 반환.
+
+재인덱싱 배치: 1,000건 단위 bulk 처리(`BATCH_SIZE = 1000`). 부분 실패 시 `log.warn` 후 계속 진행. 완료 후 `{"indexed": N}` 응답.
 
 ---
 
-## 4. 페이지네이션 진화
+## 4. 성능 측정 결과
 
-### Offset → Cursor 전환
+### 4-1. 테스트 환경
 
-Phase 1~4까지는 Spring Data의 기본 `Pageable`로 offset 기반 페이지네이션을 썼습니다.
-
-```sql
-SELECT * FROM orders WHERE user_id = ? LIMIT 20 OFFSET 10000;
-```
-
-offset이 커질수록 DB가 앞의 10,000개 row를 읽고 버리는 비효율이 생겼습니다. 페이지를 넘기는 도중에 데이터가 삽입되거나 삭제되면 같은 항목이 중복으로 보이거나 누락되는 문제도 있었습니다.
-
-Phase 5에서 cursor 기반으로 바꿨습니다.
-
-```java
-// CursorPageResponse — size+1 패턴
-public static <T, E> CursorPageResponse<T> of(
-        List<E> entities, int size,
-        Function<E, Long> idExtractor, Function<E, T> mapper) {
-    boolean hasNext = entities.size() > size;           // size+1개를 요청해서 다음 페이지 존재 여부 판단
-    List<E> content = hasNext ? entities.subList(0, size) : entities;
-    Long nextCursor = hasNext ? idExtractor.apply(content.get(content.size() - 1)) : null;
-    return new CursorPageResponse<>(mapped, nextCursor, hasNext);
-}
-```
-
-```sql
--- Cursor 기반 쿼리: 인덱스를 타므로 항상 일정한 성능
-SELECT * FROM orders WHERE user_id = ? AND id < ? ORDER BY id DESC LIMIT 21;
-```
-
-`size + 1`개를 조회해서 별도 COUNT 쿼리 없이 `hasNext`를 판단합니다. WHERE 조건으로 이전 페이지의 마지막 ID 이후만 가져오니까 데이터가 아무리 많아도 성능이 일정하고, 데이터 삽입/삭제에도 중복이나 누락이 없습니다.
-
----
-
-## 5. 인증/인가 전환
-
-### X-USER-ID 헤더 → Spring Security + JWT
-
-Week 2 설계에서는 클라이언트가 보내는 `X-USER-ID` 헤더를 그대로 신뢰하는 방식이었습니다.
-
-```java
-// Week 2 방식: 클라이언트가 보내는 헤더를 그대로 신뢰
-@RequestHeader(value = "X-USER-ID", required = false) String userId
-```
-
-문제가 심각했습니다. 아무 검증 없이 클라이언트가 보내는 userId를 그대로 쓰니까, 누구든 다른 사용자의 ID를 헤더에 넣어서 요청할 수 있었습니다. 사실상 인증이 없는 것과 같았습니다. 역할 구분도 없어서 모든 사용자가 관리자 API를 호출할 수 있었고, 토큰 만료 개념이 없어서 한번 알아낸 userId는 영구적으로 쓸 수 있었습니다.
-
-Phase 6에서 Spring Security + JWT 기반으로 전면 교체했습니다.
-
-**JWT 토큰 발급**
-
-```java
-// JwtTokenProvider
-public String createAccessToken(String userId, Role role) {
-    return Jwts.builder()
-            .subject(userId)
-            .claim("role", role.name())   // USER 또는 ADMIN
-            .issuedAt(now)
-            .expiration(new Date(now.getTime() + accessExpiration))  // 30분
-            .signWith(secretKey)          // HMAC-SHA 서명
-            .compact();
-}
-```
-
-Access Token 30분, Refresh Token 7일로 설정했습니다. Refresh Token은 Redis에 저장하고, 갱신 시 이전 토큰을 무효화하는 Token Rotation을 적용했습니다. 비밀번호는 BCrypt로 해싱합니다.
-
-**필터 체인**
-
-```java
-// JwtAuthenticationFilter — Bearer 토큰 파싱 → SecurityContext 설정
-String token = resolveToken(request);  // "Bearer {token}"에서 추출
-if (token != null && jwtTokenProvider.validateToken(token)) {
-    String userId = claims.getSubject();
-    Role role = Role.valueOf(claims.get("role", String.class));
-    UsernamePasswordAuthenticationToken authentication =
-            new UsernamePasswordAuthenticationToken(
-                    userId, null,
-                    List.of(new SimpleGrantedAuthority("ROLE_" + role.name())));
-    SecurityContextHolder.getContext().setAuthentication(authentication);
-}
-```
-
-**RBAC (역할 기반 접근 제어)**
-
-```java
-// SecurityConfig
-.requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()    // 누구나 조회 가능
-.requestMatchers(HttpMethod.POST, "/api/v1/products").hasRole("ADMIN") // 상품 생성은 ADMIN만
-.anyRequest().authenticated()                                           // 나머지는 로그인 필수
-```
-
-| 이전 | 이후 |
+| 항목 | 내용 |
 |------|------|
-| `X-USER-ID` 헤더 (검증 없음) | JWT 서명 검증 |
-| 역할 구분 없음 | USER/ADMIN RBAC |
-| 만료 없음 | Access 30분 + Refresh 7일 |
-| `@RequestHeader` 파라미터 | `SecurityContextHelper.getCurrentUserId()` |
+| 테스트 방식 | Testcontainers (ES 8.17.0 + Nori, MySQL 8.0) |
+| 측정 방법 | N회 반복 후 중간값(median) 사용 |
+| 소규모 측정 횟수 | 3회 median |
+| 대규모 측정 횟수 | 5회 median |
+| 소규모 데이터셋 | 브랜드 10개, 카테고리 5개, 수식어 20개 조합, 상품 10,000건 |
+| 대규모 데이터셋 | 브랜드 20개, 카테고리 10개, 수식어 50개 조합, 상품 500,000건 |
+| 상품명 패턴 | `{브랜드명} {수식어} {카테고리명}` |
 
-**컨트롤러 전환**
+### 4-2. 소규모 테스트 (10,000건)
 
-이전에는 `@RequestHeader("X-USER-ID") String userId`가 8개 컨트롤러에 흩어져 있었는데, `SecurityContextHelper.getCurrentUserId()`로 전부 바꿨습니다. 선택적 인증이 필요한 곳(상품 상세의 isLiked 등)에는 `getCurrentUserIdOrNull()`을 씁니다.
+#### 키워드 검색 성능
 
-```java
-String userId = SecurityContextHelper.getCurrentUserId();      // 인증 필수 API
-String userId = SecurityContextHelper.getCurrentUserIdOrNull(); // 선택적 인증 (isLiked 등)
-```
+| 키워드 | ES | MySQL LIKE | 개선율 |
+|--------|-----|------------|--------|
+| 나이키 운동화 | 14ms | 9ms | 0.6배 |
+| 프리미엄 | 10ms | 13ms | 1.3배 |
+| 에어 맥스 | 7ms | 10ms | 1.4배 |
+| 울트라 | 6ms | 7ms | 1.2배 |
 
-E2E 테스트도 10개 전부 JWT 방식으로 전환했습니다. `TestAuthHelper`를 만들어서 테스트에서도 실제 인증 플로우를 거치게 했습니다.
+10,000건 규모에서는 ES와 MySQL의 응답 시간 차이가 미미하다. 테이블 크기가 작아 MySQL 버퍼 풀에 전체 데이터가 올라가므로 풀 스캔이더라도 메모리 내 처리로 빠른 편이다. 반면 ES는 JVM 오버헤드와 HTTP 통신 비용이 추가되어 이 규모에서는 우위가 크지 않다.
 
----
+#### 형태소 분석 품질 (10,000건)
 
-## 6. 도메인 모델 진화
+| 검색어 | ES 결과 | MySQL 결과 | 차이 |
+|--------|---------|------------|------|
+| 운동화를 | 6,000건 | 0건 | ES만 매칭 (조사 분리) |
+| 프리미엄의 | 510건 | 0건 | ES만 매칭 (조사 분리) |
+| 러닝화에서 | 6,000건 | 0건 | ES만 매칭 (조사 분리) |
 
-### 6-1. 주문 상태 머신
+10,000건에서도 형태소 분석 품질 차이는 명확하다. MySQL은 모든 케이스에서 0건이다.
 
-Week 2에는 `PENDING` → `PAID` 단방향만 있었습니다. Phase 2에서 `PAID` → `CANCELLED` 전이를 추가하면서, 상태 전이 규칙을 엔티티 안에 넣었습니다.
+### 4-3. 대규모 테스트 (500,000건)
 
-```java
-public void cancel() {
-    if (this.status != OrderStatus.PAID) {
-        throw new CoreException(ErrorType.BAD_REQUEST, "결제 완료 상태의 주문만 취소할 수 있습니다.");
-    }
-    this.status = OrderStatus.CANCELLED;
-    this.cancelledAt = ZonedDateTime.now();
-}
-```
+#### 키워드 검색 성능
 
-어떤 서비스에서 `cancel()`을 호출하든 같은 비즈니스 규칙이 적용됩니다. 상태 전이 로직이 서비스 레이어에 흩어지면 규칙이 깨지기 쉬운데, 엔티티에 넣어서 그걸 막았습니다.
+| 키워드 | ES | MySQL LIKE | 개선율 |
+|--------|-----|------------|--------|
+| 나이키 운동화 | 43ms | 424ms | **9.9배** |
+| 프리미엄 러닝화 | 29ms | 167ms | **5.8배** |
+| 에어 맥스 | 19ms | 439ms | **23.1배** |
+| 울트라 부스트 | 15ms | 398ms | **26.5배** |
+| 고어텍스 등산화 | 25ms | 171ms | **6.8배** |
 
----
+데이터 규모가 50배(10,000 → 500,000)로 늘어났을 때 MySQL은 응답 시간이 10~40배 증가하지만, ES는 2~4배 수준의 증가에 그친다. ES가 최대 26.5배 빠른 결과를 보인다.
 
-### 6-2. 포인트 이력 — Audit Trail
+ES 응답 시간이 상대적으로 일정한 이유: 역인덱스는 "토큰 → 문서 목록" 직접 조회 구조로, 전체 문서 수에 관계없이 해당 토큰을 포함하는 문서만 찾는다. 반면 MySQL LIKE는 전체 행을 스캔하므로 행 수에 비례한다.
 
-이전에는 Point 엔티티에 balance만 있었습니다. 충전/사용/환불 이력이 없어서 잔액이 어떻게 변했는지 추적할 방법이 없었습니다.
+#### 깊은 페이지 성능 (500,000건, 키워드: "나이키")
 
-Phase 2에서 PointHistory 엔티티를 추가했습니다.
+| 페이지 | ES | MySQL LIKE | 개선율 |
+|--------|-----|------------|--------|
+| page=0 | 7ms | 184ms | **26.3배** |
+| page=10 | 10ms | 185ms | **18.5배** |
+| page=100 | 7ms | 175ms | **25.0배** |
+| page=499 | 13ms | 242ms | **18.6배** |
 
-```java
-// 모든 포인트 변동 시 자동으로 이력 생성
-private Point updatePointAndLog(String userId, Long amount, PointHistoryType type, ...) {
-    Point point = getPointWithLock(userId);
-    operation.accept(point, amount);
-    pointRepository.save(point);
-    pointHistoryRepository.save(
-            PointHistory.create(point, type, amount, point.getBalanceValue()));  // 변동 후 잔액 스냅샷
-    return point;
-}
-```
+MySQL의 offset 기반 페이지네이션은 page가 깊어질수록 `OFFSET n × size`만큼 행을 건너뛰어야 한다. 검색 결과 전체를 스캔한 뒤 앞의 행들을 버리는 구조이므로 성능이 점진적으로 저하된다.
 
-| 필드 | 역할 |
-|------|------|
-| `type` | CHARGE / USE / REFUND |
-| `amount` | 변동 금액 |
-| `balanceAfter` | 변동 후 잔액 (스냅샷) → 이력만으로 현재 잔액 검증 가능 |
+ES는 내부 우선순위 큐로 필요한 결과만 추출하므로 페이지 깊이에 따른 성능 저하가 훨씬 적다.
 
-이력이 포인트 변동과 같은 트랜잭션 안에서 저장되기 때문에, 포인트는 바뀌었는데 이력이 안 남는 상황은 없습니다.
+#### 인덱싱 성능 (500,000건)
 
----
+| 작업 | 소요 시간 |
+|------|----------|
+| MySQL 50만 건 삽입 | 227.2s |
+| ES 50만 건 인덱싱 | 39.5s |
 
-### 6-3. Soft Delete 패턴
+ES의 bulk 인덱싱(5,000건 단위)이 MySQL 단건 INSERT 누적보다 5.7배 빠르다. ES는 세그먼트 단위로 데이터를 누적한 뒤 병합하는 구조로 대량 쓰기에 유리하다.
 
-`BaseEntity`에 `deletedAt` 필드를 두고, `@SQLRestriction("deleted_at IS NULL")`로 조회 시 자동 필터링하는 방식입니다.
+### 4-4. 데이터 규모별 성능 변화 추세
 
-```java
-// BaseEntity
-public void delete() {
-    if (this.deletedAt == null) {
-        this.deletedAt = ZonedDateTime.now();
-    }
-}
-```
+아래 표는 "나이키 운동화" 키워드 기준 비교다.
 
-Soft Delete를 선택한 이유는 세 가지입니다. 실수로 삭제된 데이터를 복구할 수 있고, 삭제된 데이터도 외래 키 참조가 유지되고(삭제된 리뷰도 주문 이력에서 참조 가능), `@SQLRestriction` 덕분에 비즈니스 코드에서는 삭제 여부를 신경 쓸 필요가 없습니다.
+| 데이터 규모 | ES | MySQL LIKE | 개선율 |
+|------------|-----|------------|--------|
+| 10,000건 | 14ms | 9ms | 0.6배 (MySQL 우위) |
+| 500,000건 | 43ms | 424ms | 9.9배 (ES 우위) |
 
----
+10,000건에서는 MySQL이 더 빠를 수 있다. 그러나 데이터 규모가 50배 증가할 때 MySQL 응답 시간은 47배 증가하고 ES는 3배 증가한다. 이 추세로 보면 100만 건, 1,000만 건 규모에서는 ES의 우위가 더 극적으로 벌어진다.
 
-### 6-4. Clean Architecture 레이어
-
-```
-Interface Layer  → Controller, DTO, ApiSpec
-Application Layer → Facade(오케스트레이션), Command(입력), Info(출력)
-Domain Layer     → Entity, ValueObject, Service, Repository(인터페이스)
-Infrastructure   → RepositoryImpl, JpaRepository, Config
-```
-
-Facade를 도입한 건 여러 도메인 서비스를 조합하는 유스케이스가 늘어나면서입니다. 주문 하나 처리하려면 재고 + 포인트 + 쿠폰 + 이벤트를 다 건드려야 하는데, 이 조합 로직이 컨트롤러에 들어가면 컨트롤러가 뚱뚱해지고, 서비스끼리 직접 호출하면 순환 의존이 생겼습니다.
-
-Facade가 트랜잭션 경계이자 오케스트레이션 지점 역할을 맡으면서, 컨트롤러는 HTTP 관심사만, 도메인 서비스는 단일 도메인 로직만 담당하게 됐습니다. 입력(Command)과 출력(Info)을 record로 분리한 것도, API 응답 형태를 바꿔도 도메인이 영향받지 않게 하기 위해서입니다.
+소규모에서는 MySQL이 충분하지만, 데이터가 커질수록 ES의 역인덱스 구조가 압도적인 우위를 가진다.
 
 ---
 
-## 개선 흐름 요약
+## 5. 검색 품질 개선 결과
+
+### 5-1. 한글 형태소 분석 (Nori)
+
+Nori 형태소 분석기는 한국어 텍스트를 의미 단위 형태소로 분해한다.
+
+**분석 예시**
 
 ```
-Week 2: 기본 CRUD + 동시성(비관적 락)
-  ↓
-Phase 1: 미노출 API 연결 (isLiked, 페이징)
-  ↓
-Phase 2: 주문 취소(보상 트랜잭션) + 포인트 이력(Audit Trail) + 동적 쿼리(QueryDSL)
-  ↓
-Phase 3: Redis 활용 확대 (Hash 장바구니, Sorted Set 인기상품) + 캐시 무효화
-  ↓
-Phase 4: 신규 도메인(리뷰, 쿠폰, 카테고리) + Kafka 이벤트 + 선착순 동시성(SETNX)
-  ↓
-Phase 5: 운영 안정성 (분산 락, Rate Limiting, Circuit Breaker, Cursor Pagination, Graceful Shutdown)
-  ↓
-Phase 6: 인증/인가 (JWT + RBAC) — 기존 X-USER-ID 전면 교체
-  ↓
-Phase 7: Elasticsearch 검색 (예정)
+인덱싱: "나이키 에어 운동화"
+  Nori 토큰: ["나이키", "에어", "운동화"]
+  역인덱스에 저장됨
+
+검색어: "운동화를"
+  Nori 토큰: ["운동화", "를"] --> 조사 "를" 제거 --> 검색 토큰: "운동화"
+  역인덱스에서 "운동화" 토큰을 포함하는 문서 조회 --> 매칭됨
 ```
 
-각 Phase는 이전 Phase에서 발견된 한계를 해결하는 방향으로 진행했습니다. 특히 동시성 제어(비관적 락 → SETNX → 분산 락)와 캐시 전략(수동 redisTemplate → Spring Cache)은 코드 리뷰를 거치면서 단계적으로 강화됐습니다.
+**MySQL이 0건인 이유**
+
+`LIKE '%운동화를%'`는 "운동화를"이라는 완전한 부분 문자열을 찾는다. 상품명에는 "운동화를"이 없으므로 0건이 반환된다.
+
+**500,000건 기준 형태소 검색 결과**
+
+| 검색어 | ES 결과 | MySQL 결과 |
+|--------|---------|------------|
+| 운동화를 | 10,000건 (max_result_window 한도) | 0건 |
+| 프리미엄의 | 10,000건 | 0건 |
+| 러닝화에서 | 10,000건 | 0건 |
+| 등산화는 | 10,000건 | 0건 |
+
+참고: ES 결과가 10,000건으로 동일한 것은 `max_result_window: 10000` 설정으로 인한 totalHits 상한 때문이다. 실제 매칭 문서 수는 더 많다.
+
+### 5-2. 멀티필드 검색
+
+ES는 `name`, `brandName`, `categoryName` 세 필드를 동시에 검색한다. 기존 MySQL은 `name` 하나만 검색했다.
+
+"아디다스"를 검색하면 MySQL은 상품명에 "아디다스"가 포함된 것만 반환했다. ES는 `brandName` 필드에서도 매칭하므로 상품명에 브랜드명이 없더라도 해당 브랜드 상품 전체를 찾는다.
+
+"러닝"을 검색하면 `categoryName`이 "러닝화"인 상품도 Nori 형태소 분석("러닝화" → ["러닝", "화"])을 통해 매칭된다.
+
+### 5-3. 관련도 점수 (BM25)
+
+ES는 기본적으로 BM25(Best Match 25) 알고리즘으로 관련도 점수를 계산한다. MySQL에는 이 기능이 없다.
+
+BM25가 반영하는 요소:
+- **TF (Term Frequency)**: 문서에서 검색어가 자주 등장할수록 점수가 높다 (포화 효과 적용)
+- **IDF (Inverse Document Frequency)**: 전체 문서에서 희귀한 단어일수록 점수가 높다
+- **문서 길이 정규화**: 짧은 문서에서 매칭된 것이 긴 문서보다 더 관련성이 높다고 판단
+
+"나이키 흰색 운동화"를 검색하면 세 단어 모두 포함된 상품이 상위에 노출되고, 한 단어만 포함된 상품은 하위에 위치한다. MySQL은 이 구분 없이 매칭 여부만 판단한다.
+
+### 5-4. 신규 기능
+
+**자동완성 (Edge N-gram)**
+
+`name.autocomplete` 필드에 edge_ngram_analyzer를 적용하여 접두사 매칭을 지원한다. "나이"를 입력하면 "나이키 에어맥스", "나이키 덩크 로우" 등 "나이"로 시작하는 상품명이 반환된다.
+
+**집계 (Faceted Search)**
+
+브랜드별, 카테고리별, 가격대별 상품 수를 단일 쿼리로 집계한다. 가격 구간은 4개 고정 구간(~10,000 / 10,000~50,000 / 50,000~100,000 / 100,000~)으로 제공한다. 기존 MySQL 구조에서는 집계마다 별도 쿼리가 필요했다.
+
+**재인덱싱 배치**
+
+`POST /api/v1/admin/products/reindex` API로 MySQL 전체 상품을 ES에 재인덱싱한다. 1,000건 단위 bulk 처리, 부분 실패 시 계속 진행, 완료 후 인덱싱 건수 반환. ES와 MySQL 간 데이터 불일치가 발생했을 때 전체 재동기화 수단으로 활용한다.
+
+---
+
+## 6. 테스트 전략
+
+### 6-1. 테스트 구성
+
+| 테스트 클래스 | 유형 | 케이스 수 | 검증 대상 |
+|--------------|------|----------|----------|
+| `ProductSearchServiceIntegrationTest` | 통합 | 5건 | 형태소 검색, 멀티필드, 필터, match_all, 자동완성 |
+| `ProductIndexerIntegrationTest` | 통합 | 3건 | 생성/수정/삭제 이벤트 → ES 동기화 |
+| `ProductSearchServiceFallbackTest` | 통합 | Circuit Breaker | ES 장애 시 MySQL fallback |
+| `ProductSearchV1ApiE2ETest` | E2E | 4건 | 자동완성 API, 집계 API, 유효성 검증 |
+| `AdminProductV1ApiE2ETest` | E2E | 재인덱싱 | 재인덱싱 배치 API |
+| `ElasticsearchPerformanceTest` | 성능/품질 | 3건 | 10,000건 성능 비교, 형태소 품질, 멀티필드 품질 |
+| `ElasticsearchLargeScaleTest` | 성능/품질 | 4건 | 500,000건 성능, 형태소, 깊은 페이지네이션 |
+
+### 6-2. 성능 테스트 방법론
+
+- **측정 방식**: N회 반복 후 중간값(median) 사용. 평균값 대신 중간값을 사용하는 이유는 JIT 컴파일 준비 완료 후의 안정적인 응답 시간을 반영하기 위해서다.
+- **소규모 테스트**: 3회 반복 (`MEDIAN_RUNS = 3`)
+- **대규모 테스트**: 5회 반복 (`MEDIAN_RUNS = 5`)
+- **JIT Warmup 고려**: 각 테스트 케이스 내에서 반복 측정하므로 첫 번째 실행의 JIT 비용이 중간값에서 자연스럽게 제외된다.
+- **Circuit Breaker 초기화**: 각 테스트 `@BeforeEach`에서 `circuitBreakerRegistry.getAllCircuitBreakers().forEach(cb -> cb.reset())`으로 이전 테스트의 실패 상태가 전파되지 않게 한다.
+- **대규모 테스트 실행 조건**: `@EnabledIfSystemProperty(named = "test.large-scale", matches = "true")`로 기본 `./gradlew test`에서는 제외되고 명시적 활성화 시에만 실행된다.
+
+---
+
+## 7. 한계 및 향후 과제
+
+### 7-1. 현재 한계
+
+**미구현 항목 (PRD Could)**
+
+- 오타 교정 (Fuzzy Query): 편집 거리 기반 오타 허용 미적용
+- 동의어 사전: "운동화" ↔ "스니커즈" 동의어 매핑 미구현
+- 인기 검색어 (Redis ZINCRBY): 검색 로그 집계 미구현
+- 최근 검색어 (Redis List): 사용자별 검색 이력 미구현
+- Zero-downtime 재인덱싱 (Alias 전략): 현재 재인덱싱 중 서비스 중단 가능
+
+**알려진 제약**
+
+- `max_result_window: 10000`으로 offset 페이지네이션 상한이 10,000건으로 제한된다. 이를 초과하는 페이지 요청은 400을 반환한다.
+- `AFTER_COMMIT` 이벤트 방식은 애플리케이션 크래시 시 동기화 누락 가능성이 있다. 재인덱싱 배치로 주기적 재동기화가 필요하다.
+- 현재 구현은 단일 노드 ES(`discovery.type=single-node`)로, 프로덕션 환경에서는 클러스터 구성이 필요하다.
+- `xpack.security.enabled=false`는 로컬 환경 한정이며, 프로덕션에서는 보안 설정이 필수다.
+
+### 7-2. 향후 개선 방향
+
+| 항목 | 설명 | 우선순위 |
+|------|------|---------|
+| 검색어 하이라이팅 | 결과에서 매칭 부분을 `<em>` 태그로 강조 | P1 |
+| Fuzzy Query | 오타 허용 (편집 거리 1~2) | P1 |
+| 동의어 사전 | "운동화" ↔ "스니커즈" ↔ "sneakers" | P1 |
+| Zero-downtime 재인덱싱 | Alias 전략으로 무중단 스키마 변경 | P1 |
+| 인기 검색어 | 검색 로그 ES 집계 또는 Redis ZINCRBY | P2 |
+| 최근 검색어 | Redis List로 사용자별 이력 관리 | P2 |
+| `sort=relevance` | 관련도 점수 기반 정렬 옵션 추가 | P2 |
+| ES 클러스터 구성 | 프로덕션 고가용성을 위한 다중 노드 설정 | P3 |
+
+---
+
+## 8. 결론
+
+Phase 7에서 Elasticsearch 역인덱스 + Nori 형태소 분석기 도입으로 두 가지 근본적인 개선이 이루어졌다.
+
+**성능**
+
+| 지표 | 개선 결과 |
+|------|----------|
+| 키워드 검색 (500,000건) | 최대 26.5배 빠름 (울트라 부스트: 15ms vs 398ms) |
+| 깊은 페이지 (500,000건) | 최대 26.3배 빠름 (page=0: 7ms vs 184ms) |
+| 데이터 규모 증가 대응 | MySQL 47배 증가 vs ES 3배 증가 (50배 규모 증가 시) |
+| 인덱싱 속도 | ES bulk 5.7배 빠름 (39.5s vs 227.2s) |
+
+**검색 품질**
+
+| 지표 | 개선 결과 |
+|------|----------|
+| 형태소 검색 | MySQL 0건 → ES 대량 매칭 (조사 결합 검색어) |
+| 멀티필드 검색 | 상품명 단일 → 상품명 + 브랜드명 + 카테고리명 |
+| 관련도 점수 | 없음 → BM25 적용 (복수 단어 검색 품질 향상) |
+| 신규 기능 | 자동완성, 집계(faceted search), 재인덱싱 배치 추가 |
+
+소규모(10,000건)에서는 ES와 MySQL의 성능 차이가 작지만, 데이터 규모가 커질수록 역인덱스 구조의 우위가 압도적으로 커진다. 검색 품질 측면에서는 데이터 규모와 관계없이 형태소 분석과 멀티필드 검색이 즉각적인 개선을 제공한다.

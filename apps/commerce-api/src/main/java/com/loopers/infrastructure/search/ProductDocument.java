@@ -12,6 +12,7 @@ import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Document(indexName = "products", createIndex = false)
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -46,10 +47,14 @@ public class ProductDocument {
     private Long likeCount;
 
     @Field(type = FieldType.Date)
-    private ZonedDateTime createdAt;
+    private String createdAt;
 
     @Field(type = FieldType.Date)
-    private ZonedDateTime deletedAt;
+    private String deletedAt;
+
+    private static String toIsoString(ZonedDateTime dateTime) {
+        return dateTime != null ? dateTime.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME) : null;
+    }
 
     public static ProductDocument from(Product product, String brandName, String categoryName) {
         return ProductDocument.builder()
@@ -61,8 +66,8 @@ public class ProductDocument {
                 .categoryName(categoryName)
                 .price(product.getPriceValue())
                 .likeCount(product.getLikeCount())
-                .createdAt(product.getCreatedAt())
-                .deletedAt(product.getDeletedAt())
+                .createdAt(toIsoString(product.getCreatedAt()))
+                .deletedAt(toIsoString(product.getDeletedAt()))
                 .build();
     }
 }

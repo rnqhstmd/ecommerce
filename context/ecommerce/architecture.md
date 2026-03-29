@@ -93,7 +93,7 @@ Phase 6 — 인증/인가:
   SecurityConfig ── RBAC (USER/ADMIN), 엔드포인트별 권한 설정
   SecurityContextHelper ── 기존 X-USER-ID 전면 대체
 
-Phase 7 — 검색 + 개인화 (예정):
+Phase 7 — 검색 + 개인화 (구현 완료, PR #12):
   Elasticsearch 8.x ── Nori 한글 형태소 분석기 + 역인덱스
   ProductSearchService ── ES multi_match 검색 (name, brandName, categoryName)
   ProductIndexer ── Application Event 기반 MySQL → ES 동기화
@@ -107,3 +107,4 @@ Phase 7 — 검색 + 개인화 (예정):
 | 주제 | 설명 |
 |------|------|
 | [Elasticsearch 도입](elasticsearch-adoption.md) | 도입 배경, 현재 검색 한계, 예상 개선 사항, 인덱스 설계 초안 |
+| [Elasticsearch 개선 분석](improvement-analysis.md) | 도입 후 성능/품질 실측 결과, 50만건 벤치마크, 아키텍처 상세, 테스트 전략 |

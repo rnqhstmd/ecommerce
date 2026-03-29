@@ -87,7 +87,7 @@ class ProductV1ApiE2ETest {
                 .brandName(brandName)
                 .price(product.getPriceValue())
                 .likeCount(product.getLikeCount())
-                .createdAt(product.getCreatedAt())
+                .createdAt(product.getCreatedAt() != null ? product.getCreatedAt().toOffsetDateTime().toString() : null)
                 .build();
         productSearchRepository.save(doc);
     }
