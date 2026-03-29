@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 import java.util.Objects;
@@ -30,6 +31,7 @@ public class ProductReindexService {
     private final BrandService brandService;
     private final CategoryService categoryService;
 
+    @Transactional(readOnly = true)
     public long reindexAll() {
         productSearchPort.deleteAllDocuments();
         log.info("재인덱싱 시작: ES 인덱스 전체 삭제 완료");

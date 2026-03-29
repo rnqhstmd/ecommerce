@@ -4,10 +4,10 @@ import com.loopers.domain.product.FacetBucket;
 import com.loopers.domain.product.PriceRangeBucket;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductFacetResult;
-import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSearchCondition;
 import com.loopers.domain.product.ProductSearchPort;
 import com.loopers.domain.product.ProductSearchResult;
+import com.loopers.domain.product.ProductService;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +22,7 @@ import java.util.List;
 public class ProductSearchService {
 
     private final ProductSearchPort productSearchPort;
-    private final ProductRepository productRepository;
+    private final ProductService productService;
 
     @CircuitBreaker(name = "elasticsearchSearch", fallbackMethod = "searchFallback")
     public ProductSearchInfo search(ProductGetListCommand command) {
@@ -59,7 +59,7 @@ public class ProductSearchService {
                 command.brandId(), command.keyword(),
                 command.minPrice(), command.maxPrice(), command.pageable()
         );
-        Page<Product> page = productRepository.findProducts(condition);
+        Page<Product> page = productService.getProducts(condition);
         List<Long> ids = page.getContent().stream().map(Product::getId).toList();
         return new ProductSearchInfo(ids, page.getTotalElements());
     }

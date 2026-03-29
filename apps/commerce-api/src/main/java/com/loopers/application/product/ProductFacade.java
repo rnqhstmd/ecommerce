@@ -7,6 +7,7 @@ import com.loopers.domain.product.ProductSearchCondition;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.ProductUpdatedEvent;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
@@ -18,9 +19,6 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * ProductFacade — Application layer orchestrator.
  * Controllers delegate to this facade; it coordinates domain/application services.
@@ -29,9 +27,8 @@ import org.slf4j.LoggerFactory;
 @Component
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class ProductFacade {
-
-    private static final Logger log = LoggerFactory.getLogger(ProductFacade.class);
 
     private final ProductService productService;
     private final LikeService likeService;

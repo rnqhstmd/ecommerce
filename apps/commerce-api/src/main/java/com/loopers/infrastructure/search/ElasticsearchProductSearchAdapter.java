@@ -110,6 +110,7 @@ public class ElasticsearchProductSearchAdapter implements ProductSearchPort {
 
             return new ProductSearchResult(productIds, totalHits);
         } catch (IOException e) {
+            log.error("ES 검색 실패", e);
             throw new UncheckedIOException(e);
         }
     }
@@ -117,7 +118,7 @@ public class ElasticsearchProductSearchAdapter implements ProductSearchPort {
     @Override
     public List<String> autocomplete(String prefix, int size) {
         try {
-            List<Query> filters = buildFilters(null, null, null);
+            List<Query> filters = List.of(deletedAtFilter());
             Query prefixQuery = Query.of(q -> q
                     .matchPhrasePrefix(mp -> mp
                             .field("name.autocomplete")
@@ -146,6 +147,7 @@ public class ElasticsearchProductSearchAdapter implements ProductSearchPort {
                     .distinct()
                     .toList();
         } catch (IOException e) {
+            log.error("ES 자동완성 실패", e);
             throw new UncheckedIOException(e);
         }
     }
@@ -225,6 +227,7 @@ public class ElasticsearchProductSearchAdapter implements ProductSearchPort {
 
             return new ProductFacetResult(brandFacets, categoryFacets, priceRanges);
         } catch (IOException e) {
+            log.error("ES 집계 실패", e);
             throw new UncheckedIOException(e);
         }
     }
@@ -251,15 +254,18 @@ public class ElasticsearchProductSearchAdapter implements ProductSearchPort {
         };
     }
 
-    private List<Query> buildFilters(Long brandId, Long minPrice, Long maxPrice) {
-        List<Query> filters = new ArrayList<>();
-
-        // deletedAt null 필터 (필수)
-        filters.add(Query.of(f -> f
+    private Query deletedAtFilter() {
+        return Query.of(f -> f
                 .bool(fb -> fb
                         .mustNot(mn -> mn.exists(e -> e.field("deletedAt")))
                 )
-        ));
+        );
+    }
+
+    private List<Query> buildFilters(Long brandId, Long minPrice, Long maxPrice) {
+        List<Query> filters = new ArrayList<>();
+
+        filters.add(deletedAtFilter());
 
         if (brandId != null) {
             filters.add(Query.of(f -> f.term(t -> t.field("brandId").value(brandId))));

@@ -1,5 +1,7 @@
 package com.loopers.domain.product;
 
+import org.springframework.data.domain.Sort;
+
 import java.util.List;
 
 public interface ProductSearchPort {
@@ -34,7 +36,7 @@ public interface ProductSearchPort {
             Long maxPrice,
             int page,
             int size,
-            org.springframework.data.domain.Sort sort
+            Sort sort
     );
 
     /**

@@ -27,6 +27,7 @@
 | 파일 유형 | 경로 | 확인 |
 |-----------|------|------|
 | Controller, ApiSpec, Dto | `interfaces.api.{resource}` | - [ ] |
+| Admin 전용 API | `interfaces.api.admin` 패키지로 분리 (예외) | - [ ] |
 | Facade, Command, Info | `application.{entity}` | - [ ] |
 | Entity, VO, Service, Repository(if) | `domain.{entity}` | - [ ] |
 | RepositoryImpl, JpaRepository | `infrastructure.{entity}` | - [ ] |
