@@ -134,16 +134,16 @@
 
 | 요구사항 | 상태 | 상세 |
 |----------|------|------|
-| ES 인프라 구성 | ⬜ | Docker Compose + Nori 플러그인, Testcontainers |
-| Product 인덱스 설계 + 매핑 | ⬜ | name/brandName/categoryName 다중 필드, Nori 분석기 |
-| ProductIndexer (MySQL → ES 동기화) | ⬜ | Application Event(AFTER_COMMIT) 기반 실시간 동기화 |
-| 상품 검색 API (multi_match + 필터) | ⬜ | 기존 QueryDSL LIKE 검색을 ES 역인덱스 검색으로 대체 |
-| 자동완성 API (Completion Suggester) | ⬜ | Edge N-gram 토크나이저 기반 접두사 매칭 |
+| ES 인프라 구성 | ✅ | Docker Compose + Nori 커스텀 Dockerfile, Testcontainers |
+| Product 인덱스 설계 + 매핑 | ✅ | name/brandName/categoryName 다중 필드, korean + edge_ngram 분석기 |
+| ProductIndexer (MySQL → ES 동기화) | ✅ | @TransactionalEventListener(AFTER_COMMIT) 기반 실시간 동기화 |
+| 상품 검색 API (multi_match + 필터) | ✅ | ES 역인덱스 + Circuit Breaker MySQL LIKE fallback |
+| 자동완성 API (Completion Suggester) | ✅ | Edge N-gram match_phrase_prefix 기반 접두사 매칭 |
 | 검색어 하이라이팅 | ⬜ | 매칭 부분 `<em>` 태그 강조 |
-| 집계 — Faceted Search | ⬜ | 브랜드별/카테고리별/가격대별 상품 수 Aggregation |
+| 집계 — Faceted Search | ✅ | 브랜드별/카테고리별/가격대별 상품 수 Aggregation |
 | 오타 교정 (Fuzzy Query) | ⬜ | 편집 거리 기반 유사 검색어 매칭 |
 | 동의어 사전 | ⬜ | Synonym Filter ("운동화" ↔ "스니커즈" ↔ "sneakers") |
 | 인기 검색어 / 최근 검색어 | ⬜ | ES 검색 로그 집계 + Redis 사용자별 이력 |
-| 전체 데이터 재인덱싱 배치 | ⬜ | Zero-downtime reindexing (alias 전략) |
+| 전체 데이터 재인덱싱 배치 | ✅ | POST /admin/products/reindex (ADMIN 전용, 1000건 배치) |
 
 **학습 포인트**: Elasticsearch 역인덱스, Nori 한글 형태소 분석, BM25 관련도 점수, Completion Suggester, Aggregation, Application Event 기반 CDC
