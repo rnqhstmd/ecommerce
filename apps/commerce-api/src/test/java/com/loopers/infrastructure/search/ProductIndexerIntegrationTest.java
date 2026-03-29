@@ -38,6 +38,12 @@ class ProductIndexerIntegrationTest {
     @Autowired
     private TransactionTemplate transactionTemplate;
 
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        productSearchRepository.deleteAll();
+        databaseCleanUp.truncateAllTables();
+    }
+
     @AfterEach
     void tearDown() {
         productSearchRepository.deleteAll();

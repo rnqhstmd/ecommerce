@@ -1,6 +1,8 @@
 package com.loopers.application.product;
 
+import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandService;
+import com.loopers.domain.category.Category;
 import com.loopers.domain.category.CategoryService;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
@@ -10,6 +12,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -35,10 +42,31 @@ public class ProductReindexService {
 
             if (productPage.isEmpty()) break;
 
-            for (Product product : productPage.getContent()) {
+            var products = productPage.getContent();
+
+            // 페이지 단위로 brandId/categoryId를 수집하여 한 번에 조회
+            Set<Long> brandIds = products.stream()
+                    .map(Product::getBrandId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+
+            Set<Long> categoryIds = products.stream()
+                    .map(Product::getCategoryId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+
+            Map<Long, Brand> brandMap = brandIds.isEmpty()
+                    ? Map.of()
+                    : brandService.getBrandsByIds(brandIds);
+
+            Map<Long, Category> categoryMap = categoryIds.isEmpty()
+                    ? Map.of()
+                    : categoryService.getCategoriesByIds(categoryIds);
+
+            for (Product product : products) {
                 try {
-                    String brandName = resolveBrandName(product.getBrandId());
-                    String categoryName = resolveCategoryName(product.getCategoryId());
+                    String brandName = resolveBrandName(product.getBrandId(), brandMap);
+                    String categoryName = resolveCategoryName(product.getCategoryId(), categoryMap);
                     productSearchPort.indexProduct(product, brandName, categoryName);
                     indexed++;
                 } catch (Exception e) {
@@ -54,23 +82,23 @@ public class ProductReindexService {
         return indexed;
     }
 
-    private String resolveBrandName(Long brandId) {
+    private String resolveBrandName(Long brandId, Map<Long, Brand> brandMap) {
         if (brandId == null) return null;
-        try {
-            return brandService.getBrand(brandId).getName();
-        } catch (Exception e) {
-            log.warn("브랜드명 조회 실패: brandId={}, error={}", brandId, e.getMessage());
+        Brand brand = brandMap.get(brandId);
+        if (brand == null) {
+            log.warn("브랜드명 조회 실패: brandId={}", brandId);
             return null;
         }
+        return brand.getName();
     }
 
-    private String resolveCategoryName(Long categoryId) {
+    private String resolveCategoryName(Long categoryId, Map<Long, Category> categoryMap) {
         if (categoryId == null) return null;
-        try {
-            return categoryService.getById(categoryId).getName();
-        } catch (Exception e) {
-            log.warn("카테고리명 조회 실패: categoryId={}, error={}", categoryId, e.getMessage());
+        Category category = categoryMap.get(categoryId);
+        if (category == null) {
+            log.warn("카테고리명 조회 실패: categoryId={}", categoryId);
             return null;
         }
+        return category.getName();
     }
 }

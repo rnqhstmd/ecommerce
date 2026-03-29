@@ -15,7 +15,7 @@ public class ElasticsearchTestContainersConfig {
         ImageFromDockerfile noriImage = new ImageFromDockerfile("es-nori-test", false)
                 .withFileFromString("Dockerfile",
                         "FROM docker.elastic.co/elasticsearch/elasticsearch:" + ES_VERSION + "\n" +
-                        "RUN bin/elasticsearch-plugin install analysis-nori"
+                        "RUN bin/elasticsearch-plugin install --batch analysis-nori"
                 );
 
         // 이미지 빌드 후 ElasticsearchContainer에 전달

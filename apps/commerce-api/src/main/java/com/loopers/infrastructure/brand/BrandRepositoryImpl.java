@@ -7,6 +7,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -23,6 +25,11 @@ public class BrandRepositoryImpl implements BrandRepository {
     @Override
     public Optional<Brand> findById(Long id) {
         return brandJpaRepository.findById(id);
+    }
+
+    @Override
+    public List<Brand> findAllByIds(Collection<Long> ids) {
+        return brandJpaRepository.findAllById(ids);
     }
 
     @Override

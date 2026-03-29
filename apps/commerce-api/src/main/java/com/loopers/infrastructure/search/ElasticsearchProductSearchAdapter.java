@@ -46,6 +46,11 @@ public class ElasticsearchProductSearchAdapter implements ProductSearchPort {
     }
 
     @Override
+    public void deleteProduct(Long productId) {
+        productSearchRepository.deleteById(productId);
+    }
+
+    @Override
     public ProductSearchResult searchProducts(
             String keyword,
             Long brandId,

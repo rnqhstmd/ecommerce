@@ -15,6 +15,11 @@ public interface ProductSearchPort {
     void deleteAllDocuments();
 
     /**
+     * 단일 상품 문서를 ES 인덱스에서 삭제한다.
+     */
+    void deleteProduct(Long productId);
+
+    /**
      * 멀티필드 검색 (name, brandName, categoryName).
      * keyword blank -> match_all.
      * brandId/minPrice/maxPrice는 filter context.

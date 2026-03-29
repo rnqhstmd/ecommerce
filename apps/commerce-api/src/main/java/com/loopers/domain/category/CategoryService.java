@@ -6,7 +6,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -32,5 +36,10 @@ public class CategoryService {
     public Category getById(Long id) {
         return categoryRepository.findById(id)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "카테고리를 찾을 수 없습니다."));
+    }
+
+    public Map<Long, Category> getCategoriesByIds(Collection<Long> ids) {
+        return categoryRepository.findAllByIds(ids).stream()
+                .collect(Collectors.toMap(Category::getId, Function.identity()));
     }
 }

@@ -6,6 +6,7 @@ import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductCreatedEvent;
 import com.loopers.domain.product.ProductDeletedEvent;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductSearchPort;
 import com.loopers.domain.product.ProductUpdatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +21,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @Slf4j
 public class ProductIndexer {
 
-    private final ProductSearchRepository productSearchRepository;
+    private final ProductSearchPort productSearchPort;
     private final ProductRepository productRepository;
     private final BrandService brandService;
     private final CategoryService categoryService;
@@ -38,7 +39,7 @@ public class ProductIndexer {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleProductDeleted(ProductDeletedEvent event) {
         try {
-            productSearchRepository.deleteById(event.productId());
+            productSearchPort.deleteProduct(event.productId());
             log.info("ES 상품 삭제 동기화 완료: productId={}", event.productId());
         } catch (Exception e) {
             log.error("ES 상품 삭제 동기화 실패: productId={}, error={}",
@@ -55,8 +56,7 @@ public class ProductIndexer {
             }
             String brandName = resolveBrandName(product.getBrandId());
             String categoryName = resolveCategoryName(product.getCategoryId());
-            ProductDocument document = ProductDocument.from(product, brandName, categoryName);
-            productSearchRepository.save(document);
+            productSearchPort.indexProduct(product, brandName, categoryName);
             log.info("ES 상품 {} 동기화 완료: productId={}", action, productId);
         } catch (Exception e) {
             log.error("ES 상품 {} 동기화 실패: productId={}, error={}",
