@@ -10,7 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -32,7 +31,7 @@ public class ProductReindexService {
         int page = 0;
 
         while (true) {
-            Page<Product> productPage = findProductPage(page);
+            Page<Product> productPage = productRepository.findAllPaged(PageRequest.of(page, BATCH_SIZE));
 
             if (productPage.isEmpty()) break;
 
@@ -55,20 +54,23 @@ public class ProductReindexService {
         return indexed;
     }
 
-    @Transactional(readOnly = true)
-    protected Page<Product> findProductPage(int page) {
-        return productRepository.findAllPaged(PageRequest.of(page, BATCH_SIZE));
-    }
-
     private String resolveBrandName(Long brandId) {
         if (brandId == null) return null;
-        try { return brandService.getBrand(brandId).getName(); }
-        catch (Exception e) { return null; }
+        try {
+            return brandService.getBrand(brandId).getName();
+        } catch (Exception e) {
+            log.warn("브랜드명 조회 실패: brandId={}, error={}", brandId, e.getMessage());
+            return null;
+        }
     }
 
     private String resolveCategoryName(Long categoryId) {
         if (categoryId == null) return null;
-        try { return categoryService.getById(categoryId).getName(); }
-        catch (Exception e) { return null; }
+        try {
+            return categoryService.getById(categoryId).getName();
+        } catch (Exception e) {
+            log.warn("카테고리명 조회 실패: categoryId={}, error={}", categoryId, e.getMessage());
+            return null;
+        }
     }
 }

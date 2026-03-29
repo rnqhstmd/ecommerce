@@ -40,5 +40,8 @@ out/
 .dev/
 .omc/
 
+### macOS ###
+.DS_Store
+
 ### Kotlin ###
 .kotlin

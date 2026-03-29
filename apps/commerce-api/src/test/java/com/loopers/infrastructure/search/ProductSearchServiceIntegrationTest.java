@@ -1,7 +1,7 @@
 package com.loopers.infrastructure.search;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
-import com.loopers.application.product.ProductSearchResult;
+import com.loopers.domain.product.ProductSearchResult;
 import com.loopers.domain.product.ProductSearchPort;
 import com.loopers.utils.DatabaseCleanUp;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;

@@ -1,8 +1,5 @@
 package com.loopers.domain.product;
 
-import com.loopers.application.product.ProductSearchResult;
-import com.loopers.application.product.ProductFacetResult;
-
 import java.util.List;
 
 public interface ProductSearchPort {

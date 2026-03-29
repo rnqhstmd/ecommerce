@@ -7,10 +7,10 @@ import co.elastic.clients.elasticsearch._types.aggregations.*;
 import co.elastic.clients.elasticsearch._types.query_dsl.*;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
-import com.loopers.application.product.FacetBucket;
-import com.loopers.application.product.PriceRangeBucket;
-import com.loopers.application.product.ProductFacetResult;
-import com.loopers.application.product.ProductSearchResult;
+import com.loopers.domain.product.FacetBucket;
+import com.loopers.domain.product.PriceRangeBucket;
+import com.loopers.domain.product.ProductFacetResult;
+import com.loopers.domain.product.ProductSearchResult;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductSearchPort;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +28,8 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class ElasticsearchProductSearchAdapter implements ProductSearchPort {
+
+    private static final String INDEX_NAME = "products";
 
     private final ElasticsearchClient esClient;
     private final ProductSearchRepository productSearchRepository;
@@ -74,7 +76,7 @@ public class ElasticsearchProductSearchAdapter implements ProductSearchPort {
 
             Query finalQuery = mainQuery;
             SearchResponse<ProductDocument> response = esClient.search(s -> {
-                        s.index("products")
+                        s.index(INDEX_NAME)
                             .query(q -> q
                                     .bool(b -> {
                                         b.must(finalQuery);
@@ -110,24 +112,22 @@ public class ElasticsearchProductSearchAdapter implements ProductSearchPort {
     @Override
     public List<String> autocomplete(String prefix, int size) {
         try {
+            List<Query> filters = buildFilters(null, null, null);
+            Query prefixQuery = Query.of(q -> q
+                    .matchPhrasePrefix(mp -> mp
+                            .field("name.autocomplete")
+                            .query(prefix)
+                    )
+            );
+
             SearchResponse<ProductDocument> response = esClient.search(s -> s
-                            .index("products")
+                            .index(INDEX_NAME)
                             .query(q -> q
-                                    .bool(b -> b
-                                            .must(m -> m
-                                                    .matchPhrasePrefix(mp -> mp
-                                                            .field("name.autocomplete")
-                                                            .query(prefix)
-                                                    )
-                                            )
-                                            .filter(f -> f
-                                                    .bool(fb -> fb
-                                                            .mustNot(mn -> mn
-                                                                    .exists(e -> e.field("deletedAt"))
-                                                            )
-                                                    )
-                                            )
-                                    )
+                                    .bool(b -> {
+                                        b.must(prefixQuery);
+                                        filters.forEach(b::filter);
+                                        return b;
+                                    })
                             )
                             .size(size)
                             .source(sc -> sc.filter(sf -> sf.includes("name"))),
@@ -170,7 +170,7 @@ public class ElasticsearchProductSearchAdapter implements ProductSearchPort {
 
             Query finalQuery = mainQuery;
             SearchResponse<ProductDocument> response = esClient.search(s -> s
-                            .index("products")
+                            .index(INDEX_NAME)
                             .size(0)
                             .query(q -> q
                                     .bool(b -> {

@@ -1,5 +1,9 @@
 package com.loopers.application.product;
 
+import com.loopers.domain.product.FacetBucket;
+import com.loopers.domain.product.PriceRangeBucket;
+import com.loopers.domain.product.ProductFacetResult;
+
 import java.util.List;
 
 public record ProductFacetInfo(

@@ -21,6 +21,11 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * ProductFacade — Application layer orchestrator.
+ * Controllers delegate to this facade; it coordinates domain/application services.
+ */
+
 @Component
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -32,6 +37,7 @@ public class ProductFacade {
     private final LikeService likeService;
     private final PopularProductService popularProductService;
     private final ProductSearchService productSearchService;
+    private final ProductReindexService productReindexService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -85,6 +91,18 @@ public class ProductFacade {
 
     public List<PopularProductInfo> getPopularProducts(int limit) {
         return popularProductService.getPopularProducts(limit);
+    }
+
+    public List<String> autocomplete(String keyword, int size) {
+        return productSearchService.autocomplete(keyword, size);
+    }
+
+    public ProductFacetInfo facets(String keyword, Long minPrice, Long maxPrice) {
+        return productSearchService.facets(keyword, minPrice, maxPrice);
+    }
+
+    public long reindexAll() {
+        return productReindexService.reindexAll();
     }
 
     public ProductListInfo getProducts(ProductGetListCommand command) {

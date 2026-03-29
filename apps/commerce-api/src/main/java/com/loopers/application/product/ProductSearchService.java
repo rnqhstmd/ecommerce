@@ -1,9 +1,13 @@
 package com.loopers.application.product;
 
+import com.loopers.domain.product.FacetBucket;
+import com.loopers.domain.product.PriceRangeBucket;
 import com.loopers.domain.product.Product;
+import com.loopers.domain.product.ProductFacetResult;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSearchCondition;
 import com.loopers.domain.product.ProductSearchPort;
+import com.loopers.domain.product.ProductSearchResult;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

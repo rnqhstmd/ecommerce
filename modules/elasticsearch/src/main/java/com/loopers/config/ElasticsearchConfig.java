@@ -41,6 +41,7 @@ public class ElasticsearchConfig {
                 log.info("ES '{}' 인덱스 이미 존재", INDEX_NAME);
             }
         } catch (Exception e) {
+            // 의도적 silent: Circuit Breaker fallback이 MySQL LIKE로 전환하므로 기동은 차단하지 않음
             log.error("ES '{}' 인덱스 생성 실패: {}", INDEX_NAME, e.getMessage(), e);
         }
     }

@@ -131,14 +131,44 @@
   "hotPaths": [
     {
       "path": "",
-      "accessCount": 31,
-      "lastAccessed": 1774766465895,
+      "accessCount": 73,
+      "lastAccessed": 1774769938256,
       "type": "directory"
     },
     {
+      "path": "apps/commerce-api/src/main/java/com/loopers/application/product/ProductFacade.java",
+      "accessCount": 18,
+      "lastAccessed": 1774781958977,
+      "type": "file"
+    },
+    {
       "path": "apps/commerce-api/src/main/java/com/loopers/domain/product/ProductRepository.java",
+      "accessCount": 15,
+      "lastAccessed": 1774781568388,
+      "type": "file"
+    },
+    {
+      "path": "apps/commerce-api/src/main/resources/application.yml",
+      "accessCount": 14,
+      "lastAccessed": 1774781206222,
+      "type": "file"
+    },
+    {
+      "path": "apps/commerce-api/src/main/java",
       "accessCount": 12,
-      "lastAccessed": 1774767334462,
+      "lastAccessed": 1774769824360,
+      "type": "directory"
+    },
+    {
+      "path": "docker/infra-compose.yml",
+      "accessCount": 12,
+      "lastAccessed": 1774781210502,
+      "type": "file"
+    },
+    {
+      "path": "apps/commerce-api/src/main/java/com/loopers/infrastructure/product/ProductRepositoryImpl.java",
+      "accessCount": 12,
+      "lastAccessed": 1774781229806,
       "type": "file"
     },
     {
@@ -148,27 +178,15 @@
       "type": "file"
     },
     {
-      "path": "apps/commerce-api/src/main/resources/application.yml",
-      "accessCount": 10,
-      "lastAccessed": 1774767110408,
-      "type": "file"
-    },
-    {
-      "path": "apps/commerce-api/src/main/java/com/loopers/infrastructure/product/ProductRepositoryImpl.java",
-      "accessCount": 10,
-      "lastAccessed": 1774767117674,
-      "type": "file"
-    },
-    {
       "path": "apps/commerce-api/src/main/java/com/loopers/infrastructure/product/ProductJpaRepository.java",
-      "accessCount": 10,
-      "lastAccessed": 1774767118176,
+      "accessCount": 11,
+      "lastAccessed": 1774781230283,
       "type": "file"
     },
     {
-      "path": "docker/infra-compose.yml",
-      "accessCount": 10,
-      "lastAccessed": 1774767459747,
+      "path": "apps/commerce-api/src/main/java/com/loopers/application/product/ProductGetListCommand.java",
+      "accessCount": 11,
+      "lastAccessed": 1774781965440,
       "type": "file"
     },
     {
@@ -178,9 +196,9 @@
       "type": "file"
     },
     {
-      "path": "apps/commerce-api/src/main/java/com/loopers/application/product/ProductFacade.java",
+      "path": "apps/commerce-api/src/main/java/com/loopers/domain/product/ProductService.java",
       "accessCount": 9,
-      "lastAccessed": 1774767115018,
+      "lastAccessed": 1774781232224,
       "type": "file"
     },
     {
@@ -190,27 +208,33 @@
       "type": "file"
     },
     {
-      "path": "apps/commerce-api/src/main/java/com/loopers/domain/product/ProductService.java",
-      "accessCount": 8,
-      "lastAccessed": 1774765690288,
-      "type": "file"
-    },
-    {
       "path": "apps/commerce-api/src/main/java/com/loopers/infrastructure/product/ProductQueryRepository.java",
       "accessCount": 8,
       "lastAccessed": 1774766454570,
       "type": "file"
     },
     {
+      "path": ".dev/prd.md",
+      "accessCount": 8,
+      "lastAccessed": 1774767552794,
+      "type": "file"
+    },
+    {
       "path": "apps/commerce-api",
-      "accessCount": 7,
-      "lastAccessed": 1774765176687,
+      "accessCount": 8,
+      "lastAccessed": 1774769792294,
       "type": "directory"
     },
     {
-      "path": ".dev/prd.md",
+      "path": "apps/commerce-api/src/main/java/com/loopers/domain/product/ProductSearchCondition.java",
       "accessCount": 7,
-      "lastAccessed": 1774767087137,
+      "lastAccessed": 1774781231145,
+      "type": "file"
+    },
+    {
+      "path": "apps/commerce-api/src/main/java/com/loopers/application/product/ProductListInfo.java",
+      "accessCount": 7,
+      "lastAccessed": 1774782027601,
       "type": "file"
     },
     {
@@ -220,27 +244,21 @@
       "type": "file"
     },
     {
-      "path": "apps/commerce-api/src/main/java/com/loopers/application/product/ProductGetListCommand.java",
+      "path": "references/01-layered-architecture.md",
       "accessCount": 6,
-      "lastAccessed": 1774767129925,
+      "lastAccessed": 1774781174368,
       "type": "file"
     },
     {
-      "path": "apps/commerce-api/src/main/java",
+      "path": "apps/commerce-api/src/main/java/com/loopers/interfaces/api/product/ProductV1Controller.java",
       "accessCount": 6,
-      "lastAccessed": 1774767466113,
-      "type": "directory"
+      "lastAccessed": 1774782069385,
+      "type": "file"
     },
     {
       "path": "context/ecommerce/README.md",
       "accessCount": 5,
       "lastAccessed": 1774764774201,
-      "type": "file"
-    },
-    {
-      "path": "apps/commerce-api/src/main/java/com/loopers/domain/product/ProductSearchCondition.java",
-      "accessCount": 5,
-      "lastAccessed": 1774764959303,
       "type": "file"
     },
     {
@@ -256,15 +274,15 @@
       "type": "file"
     },
     {
-      "path": "references/01-layered-architecture.md",
+      "path": "apps/commerce-api/src/main/java/com/loopers/domain/product",
       "accessCount": 5,
-      "lastAccessed": 1774767111847,
-      "type": "file"
+      "lastAccessed": 1774767754478,
+      "type": "directory"
     },
     {
-      "path": "apps/commerce-api/src/main/java/com/loopers/application/product/ProductListInfo.java",
+      "path": "settings.gradle.kts",
       "accessCount": 5,
-      "lastAccessed": 1774767113079,
+      "lastAccessed": 1774781231587,
       "type": "file"
     },
     {
@@ -280,27 +298,15 @@
       "type": "file"
     },
     {
-      "path": "settings.gradle.kts",
+      "path": "references/03-error-handling.md",
       "accessCount": 4,
-      "lastAccessed": 1774766359656,
+      "lastAccessed": 1774781175441,
       "type": "file"
-    },
-    {
-      "path": "apps/commerce-api/src/main/java/com/loopers/domain/product",
-      "accessCount": 4,
-      "lastAccessed": 1774767128676,
-      "type": "directory"
     },
     {
       "path": "apps/commerce-api/src/main/java/com/loopers/application/product/PopularProductService.java",
       "accessCount": 3,
       "lastAccessed": 1774765160803,
-      "type": "file"
-    },
-    {
-      "path": "apps/commerce-api/src/main/java/com/loopers/interfaces/api/product/ProductV1Controller.java",
-      "accessCount": 3,
-      "lastAccessed": 1774765181877,
       "type": "file"
     },
     {
@@ -310,9 +316,15 @@
       "type": "file"
     },
     {
-      "path": "references/03-error-handling.md",
+      "path": "references/05-naming-conventions.md",
       "accessCount": 3,
-      "lastAccessed": 1774767112153,
+      "lastAccessed": 1774781175898,
+      "type": "file"
+    },
+    {
+      "path": "references/04-testing-guide.md",
+      "accessCount": 3,
+      "lastAccessed": 1774781175948,
       "type": "file"
     },
     {
@@ -325,12 +337,6 @@
       "path": "context/ecommerce/elasticsearch-adoption.md",
       "accessCount": 2,
       "lastAccessed": 1774764059069,
-      "type": "file"
-    },
-    {
-      "path": "references/04-testing-guide.md",
-      "accessCount": 2,
-      "lastAccessed": 1774764378556,
       "type": "file"
     },
     {
@@ -358,9 +364,9 @@
       "type": "file"
     },
     {
-      "path": "references/05-naming-conventions.md",
+      "path": "references/02-domain-patterns.md",
       "accessCount": 2,
-      "lastAccessed": 1774767112526,
+      "lastAccessed": 1774781174829,
       "type": "file"
     },
     {
@@ -421,12 +427,6 @@
       "path": "apps/commerce-api/src/main/java/com/loopers/domain/point/PointInitializationEventListener.java",
       "accessCount": 1,
       "lastAccessed": 1774764068713,
-      "type": "file"
-    },
-    {
-      "path": "references/02-domain-patterns.md",
-      "accessCount": 1,
-      "lastAccessed": 1774764378084,
       "type": "file"
     }
   ],
