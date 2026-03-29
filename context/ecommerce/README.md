@@ -25,15 +25,18 @@ Spring Boot 3.4.4 / Java 21 기반 멀티모듈 이커머스 플랫폼. 학습 �
 
 ## 현재 상태
 
-Week 2 요구사항 전체 구현 완료 (5/5). DDD 리팩토링 완료. 테스트 131개 전체 통과. Redis 캐시 작업 진행 중 (미커밋).
+Phase 1~6 전체 구현 완료. Week 2 요구사항 + 확장 로드맵 6단계 모두 머지됨. 컨트롤러 11개, 도메인 10개 (User, Order, Product, Brand, Point, Like, Cart, Review, Coupon, Category). 테스트 전체 통과.
 
 ## 확장 로드맵
 
 | Phase | 주제 | 핵심 학습 포인트 | 상태 |
 |-------|------|-----------------|------|
-| 1 | 미노출 API 연결 + Week 2 완성 | 페이징 응답, 조건부 필드 (isLiked) | ⬜ 6건 |
-| 2 | 주문 생명주기 + 포인트 이력 | 보상 트랜잭션, QueryDSL 동적 쿼리, Audit Trail | ⬜ 5건 |
-| 3 | 장바구니 + 상품 관리 확장 | Redis Hash/Sorted Set, 캐시 무효화 전략 | ⬜ 9건 |
-| 4 | 리뷰 + 쿠폰 + 알림 | 선착순 동시성(Redis DECR), Kafka consumer, 계층형 모델 | ⬜ 9건 |
+| 1 | 미노출 API 연결 + Week 2 완성 | 페이징 응답, 조건부 필드 (isLiked) | ✅ 6/6 (PR #5) |
+| 2 | 주문 생명주기 + 포인트 이력 | 보상 트랜잭션, QueryDSL 동적 쿼리, Audit Trail | ✅ 5/5 (PR #7) |
+| 3 | 장바구니 + 상품 관리 확장 | Redis Hash/Sorted Set, 캐시 무효화 전략 | ✅ 9/9 (PR #8) |
+| 4 | 리뷰 + 쿠폰 + 알림 + 카테고리 | 선착순 동시성(Redis DECR), Kafka consumer, 계층형 모델 | ✅ 9/9 (PR #9) |
+| 5 | 운영 안정성 + 성능 최적화 | 분산 락, Rate Limiting, Circuit Breaker, Cursor Pagination | ✅ 6/6 (PR #10) |
+| 6 | Spring Security + JWT 인증/인가 | JWT Access/Refresh, RBAC, Spring Security 필터 체인 | ✅ 6/6 (PR #11) |
+| 7 | 검색 + 개인화 (Elasticsearch) | Nori 한글 형태소 분석, 역인덱스, 자동완성, Faceted Search | ⬜ 11건 |
 
-상세: [status.md](status.md)
+상세: [status.md](status.md) / 도입 배경: [elasticsearch-adoption.md](elasticsearch-adoption.md)

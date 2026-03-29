@@ -26,6 +26,7 @@ spring:
       - redis.yml
       - logging.yml
       - monitoring.yml
+      - elasticsearch.yml
 
 management:
   endpoints:
@@ -50,6 +51,12 @@ resilience4j:
   circuitbreaker:
     instances:
       kafkaPublisher:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        register-health-indicator: true
+      elasticsearchSearch:
         sliding-window-size: 10
         failure-rate-threshold: 50
         wait-duration-in-open-state: 10s

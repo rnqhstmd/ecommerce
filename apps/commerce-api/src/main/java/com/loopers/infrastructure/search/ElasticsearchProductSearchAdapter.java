@@ -1,0 +1,277 @@
+package com.loopers.infrastructure.search;
+
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.SortOptions;
+import co.elastic.clients.elasticsearch._types.SortOrder;
+import co.elastic.clients.elasticsearch._types.aggregations.*;
+import co.elastic.clients.elasticsearch._types.query_dsl.*;
+import co.elastic.clients.elasticsearch.core.SearchResponse;
+import co.elastic.clients.elasticsearch.core.search.Hit;
+import com.loopers.application.product.FacetBucket;
+import com.loopers.application.product.PriceRangeBucket;
+import com.loopers.application.product.ProductFacetResult;
+import com.loopers.application.product.ProductSearchResult;
+import com.loopers.domain.product.Product;
+import com.loopers.domain.product.ProductSearchPort;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.ArrayList;
+import java.util.List;
+
+@Component
+@ConditionalOnProperty(name = "spring.elasticsearch.enabled", havingValue = "true", matchIfMissing = true)
+@RequiredArgsConstructor
+@Slf4j
+public class ElasticsearchProductSearchAdapter implements ProductSearchPort {
+
+    private final ElasticsearchClient esClient;
+    private final ProductSearchRepository productSearchRepository;
+
+    @Override
+    public void indexProduct(Product product, String brandName, String categoryName) {
+        ProductDocument document = ProductDocument.from(product, brandName, categoryName);
+        productSearchRepository.save(document);
+    }
+
+    @Override
+    public void deleteAllDocuments() {
+        productSearchRepository.deleteAll();
+    }
+
+    @Override
+    public ProductSearchResult searchProducts(
+            String keyword,
+            Long brandId,
+            Long minPrice,
+            Long maxPrice,
+            int page,
+            int size,
+            org.springframework.data.domain.Sort sort
+    ) {
+        try {
+            List<Query> filters = buildFilters(brandId, minPrice, maxPrice);
+
+            Query mainQuery;
+            if (keyword == null || keyword.isBlank()) {
+                mainQuery = Query.of(q -> q.matchAll(m -> m));
+            } else {
+                mainQuery = Query.of(q -> q
+                        .multiMatch(mm -> mm
+                                .query(keyword)
+                                .fields("name", "brandName", "categoryName")
+                                .type(TextQueryType.BestFields)
+                                .tieBreaker(0.3)
+                        )
+                );
+            }
+
+            List<SortOptions> sortOptions = buildSortOptions(sort);
+
+            Query finalQuery = mainQuery;
+            SearchResponse<ProductDocument> response = esClient.search(s -> {
+                        s.index("products")
+                            .query(q -> q
+                                    .bool(b -> {
+                                        b.must(finalQuery);
+                                        filters.forEach(b::filter);
+                                        return b;
+                                    })
+                            )
+                            .from(page * size)
+                            .size(size);
+                        if (!sortOptions.isEmpty()) {
+                            s.sort(sortOptions);
+                        }
+                        return s;
+                    },
+                    ProductDocument.class
+            );
+
+            List<Long> productIds = response.hits().hits().stream()
+                    .map(Hit::source)
+                    .filter(doc -> doc != null)
+                    .map(ProductDocument::getId)
+                    .toList();
+
+            long totalHits = response.hits().total() != null
+                    ? response.hits().total().value() : 0L;
+
+            return new ProductSearchResult(productIds, totalHits);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Override
+    public List<String> autocomplete(String prefix, int size) {
+        try {
+            SearchResponse<ProductDocument> response = esClient.search(s -> s
+                            .index("products")
+                            .query(q -> q
+                                    .bool(b -> b
+                                            .must(m -> m
+                                                    .matchPhrasePrefix(mp -> mp
+                                                            .field("name.autocomplete")
+                                                            .query(prefix)
+                                                    )
+                                            )
+                                            .filter(f -> f
+                                                    .bool(fb -> fb
+                                                            .mustNot(mn -> mn
+                                                                    .exists(e -> e.field("deletedAt"))
+                                                            )
+                                                    )
+                                            )
+                                    )
+                            )
+                            .size(size)
+                            .source(sc -> sc.filter(sf -> sf.includes("name"))),
+                    ProductDocument.class
+            );
+
+            return response.hits().hits().stream()
+                    .map(Hit::source)
+                    .filter(doc -> doc != null)
+                    .map(ProductDocument::getName)
+                    .distinct()
+                    .toList();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Override
+    public ProductFacetResult facets(
+            String keyword,
+            Long minPrice,
+            Long maxPrice
+    ) {
+        try {
+            List<Query> filters = buildFilters(null, minPrice, maxPrice);
+
+            Query mainQuery;
+            if (keyword == null || keyword.isBlank()) {
+                mainQuery = Query.of(q -> q.matchAll(m -> m));
+            } else {
+                mainQuery = Query.of(q -> q
+                        .multiMatch(mm -> mm
+                                .query(keyword)
+                                .fields("name", "brandName", "categoryName")
+                                .type(TextQueryType.BestFields)
+                                .tieBreaker(0.3)
+                        )
+                );
+            }
+
+            Query finalQuery = mainQuery;
+            SearchResponse<ProductDocument> response = esClient.search(s -> s
+                            .index("products")
+                            .size(0)
+                            .query(q -> q
+                                    .bool(b -> {
+                                        b.must(finalQuery);
+                                        filters.forEach(b::filter);
+                                        return b;
+                                    })
+                            )
+                            .aggregations("brand_facets", a -> a
+                                    .terms(t -> t.field("brandName.keyword").size(50))
+                            )
+                            .aggregations("category_facets", a -> a
+                                    .terms(t -> t.field("categoryName.keyword").size(50))
+                            )
+                            .aggregations("price_ranges", a -> a
+                                    .range(r -> r
+                                            .field("price")
+                                            .ranges(rng -> rng.key("~10,000").to(10000.0))
+                                            .ranges(rng -> rng.key("10,000~50,000").from(10000.0).to(50000.0))
+                                            .ranges(rng -> rng.key("50,000~100,000").from(50000.0).to(100000.0))
+                                            .ranges(rng -> rng.key("100,000~").from(100000.0))
+                                    )
+                            ),
+                    ProductDocument.class
+            );
+
+            // brand facets 파싱
+            List<FacetBucket> brandFacets = new ArrayList<>();
+            StringTermsAggregate brandAgg = response.aggregations().get("brand_facets").sterms();
+            for (StringTermsBucket bucket : brandAgg.buckets().array()) {
+                brandFacets.add(new FacetBucket(bucket.key().stringValue(), bucket.docCount()));
+            }
+
+            // category facets 파싱
+            List<FacetBucket> categoryFacets = new ArrayList<>();
+            StringTermsAggregate categoryAgg = response.aggregations().get("category_facets").sterms();
+            for (StringTermsBucket bucket : categoryAgg.buckets().array()) {
+                categoryFacets.add(new FacetBucket(bucket.key().stringValue(), bucket.docCount()));
+            }
+
+            // price ranges 파싱
+            List<PriceRangeBucket> priceRanges = new ArrayList<>();
+            RangeAggregate priceAgg = response.aggregations().get("price_ranges").range();
+            for (RangeBucket bucket : priceAgg.buckets().array()) {
+                priceRanges.add(new PriceRangeBucket(bucket.key(), bucket.docCount()));
+            }
+
+            return new ProductFacetResult(brandFacets, categoryFacets, priceRanges);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private List<SortOptions> buildSortOptions(org.springframework.data.domain.Sort sort) {
+        List<SortOptions> sortOptions = new ArrayList<>();
+        if (sort == null || sort.isUnsorted()) {
+            return sortOptions;
+        }
+        for (org.springframework.data.domain.Sort.Order order : sort) {
+            String field = mapSortField(order.getProperty());
+            SortOrder direction = order.isAscending() ? SortOrder.Asc : SortOrder.Desc;
+            sortOptions.add(SortOptions.of(so -> so.field(f -> f.field(field).order(direction))));
+        }
+        return sortOptions;
+    }
+
+    private String mapSortField(String property) {
+        return switch (property) {
+            case "price.value" -> "price";
+            case "createdAt" -> "createdAt";
+            case "likeCount" -> "likeCount";
+            default -> property;
+        };
+    }
+
+    private List<Query> buildFilters(Long brandId, Long minPrice, Long maxPrice) {
+        List<Query> filters = new ArrayList<>();
+
+        // deletedAt null 필터 (필수)
+        filters.add(Query.of(f -> f
+                .bool(fb -> fb
+                        .mustNot(mn -> mn.exists(e -> e.field("deletedAt")))
+                )
+        ));
+
+        if (brandId != null) {
+            filters.add(Query.of(f -> f.term(t -> t.field("brandId").value(brandId))));
+        }
+        if (minPrice != null || maxPrice != null) {
+            filters.add(Query.of(f -> f
+                    .range(r -> r
+                            .number(nr -> {
+                                nr.field("price");
+                                if (minPrice != null) nr.gte(minPrice.doubleValue());
+                                if (maxPrice != null) nr.lte(maxPrice.doubleValue());
+                                return nr;
+                            })
+                    )
+            ));
+        }
+
+        return filters;
+    }
+}

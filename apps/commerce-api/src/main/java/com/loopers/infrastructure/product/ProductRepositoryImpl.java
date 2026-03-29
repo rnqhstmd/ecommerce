@@ -5,6 +5,7 @@ import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSearchCondition;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
@@ -63,5 +64,10 @@ public class ProductRepositoryImpl implements ProductRepository {
         return jpaRepository.findTopByLikeCountDesc(
                 org.springframework.data.domain.PageRequest.of(0, limit)
         );
+    }
+
+    @Override
+    public Page<Product> findAllPaged(Pageable pageable) {
+        return jpaRepository.findByDeletedAtIsNull(pageable);
     }
 }
