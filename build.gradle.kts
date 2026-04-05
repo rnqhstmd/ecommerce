@@ -93,6 +93,9 @@ subprojects {
         systemProperty("user.timezone", "Asia/Seoul")
         systemProperty("spring.profiles.active", "test")
         jvmArgs("-Xshare:off")
+        // Gradle -D 프로퍼티를 테스트 JVM에 전달 (large-scale 테스트 등)
+        System.getProperties().filter { (k, _) -> (k as String).startsWith("test.") }
+            .forEach { (k, v) -> systemProperty(k as String, v) }
         // Testcontainers Docker Desktop 29.x 호환: DOCKER_HOST를 raw socket으로 지정
         // Docker Desktop 업데이트 또는 Testcontainers 호환 패치 후 제거 가능
         // 로컬 개발 시 gradle.properties에 dockerHost=unix:///path/to/docker.raw.sock 설정

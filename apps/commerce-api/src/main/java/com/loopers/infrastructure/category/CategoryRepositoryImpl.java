@@ -5,6 +5,7 @@ import com.loopers.domain.category.CategoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,6 +23,11 @@ public class CategoryRepositoryImpl implements CategoryRepository {
     @Override
     public Optional<Category> findById(Long id) {
         return jpaRepository.findById(id);
+    }
+
+    @Override
+    public List<Category> findAllByIds(Collection<Long> ids) {
+        return jpaRepository.findAllById(ids);
     }
 
     @Override

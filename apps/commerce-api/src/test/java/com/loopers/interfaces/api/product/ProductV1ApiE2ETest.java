@@ -1,9 +1,12 @@
 package com.loopers.interfaces.api.product;
 
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.infrastructure.search.ProductDocument;
+import com.loopers.infrastructure.search.ProductSearchRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.like.LikeV1Dto;
 import com.loopers.support.TestAuthHelper;
@@ -19,6 +22,8 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.*;
+
+import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -44,6 +49,12 @@ class ProductV1ApiE2ETest {
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
+    @Autowired
+    private ProductSearchRepository productSearchRepository;
+
+    @Autowired
+    private ElasticsearchClient elasticsearchClient;
+
     private String adminToken;
     private String userToken;
 
@@ -64,7 +75,29 @@ class ProductV1ApiE2ETest {
     void tearDown() {
         // 인기 상품 캐시 초기화
         redisTemplate.delete("product:popular");
+        productSearchRepository.deleteAll();
         databaseCleanUp.truncateAllTables();
+    }
+
+    private void indexToEs(Product product, String brandName) {
+        ProductDocument doc = ProductDocument.builder()
+                .id(product.getId())
+                .name(product.getName())
+                .brandId(product.getBrandId())
+                .brandName(brandName)
+                .price(product.getPriceValue())
+                .likeCount(product.getLikeCount())
+                .createdAt(product.getCreatedAt() != null ? product.getCreatedAt().toOffsetDateTime().toString() : null)
+                .build();
+        productSearchRepository.save(doc);
+    }
+
+    private void refreshEs() {
+        try {
+            elasticsearchClient.indices().refresh(r -> r.index("products"));
+        } catch (IOException e) {
+            throw new RuntimeException("ES refresh failed", e);
+        }
     }
 
     @DisplayName("POST /api/v1/products - ADMIN이 상품 생성에 성공한다.")
@@ -154,8 +187,10 @@ class ProductV1ApiE2ETest {
         // arrange
         Brand brand = brandRepository.save(Brand.create("Paging Brand"));
         for (int i = 1; i <= 3; i++) {
-            productRepository.save(Product.create("Product " + i, 1000L * i, 10, brand.getId()));
+            Product p = productRepository.save(Product.create("Product " + i, 1000L * i, 10, brand.getId()));
+            indexToEs(p, "Paging Brand");
         }
+        refreshEs();
 
         // act
         ResponseEntity<ApiResponse<ProductV1Dto.ProductListResponse>> response =
@@ -182,9 +217,13 @@ class ProductV1ApiE2ETest {
         // arrange
         Brand brand1 = brandRepository.save(Brand.create("Brand A"));
         Brand brand2 = brandRepository.save(Brand.create("Brand B"));
-        productRepository.save(Product.create("Product A1", 1000L, 10, brand1.getId()));
-        productRepository.save(Product.create("Product A2", 2000L, 10, brand1.getId()));
-        productRepository.save(Product.create("Product B1", 3000L, 10, brand2.getId()));
+        Product p1 = productRepository.save(Product.create("Product A1", 1000L, 10, brand1.getId()));
+        Product p2 = productRepository.save(Product.create("Product A2", 2000L, 10, brand1.getId()));
+        Product p3 = productRepository.save(Product.create("Product B1", 3000L, 10, brand2.getId()));
+        indexToEs(p1, "Brand A");
+        indexToEs(p2, "Brand A");
+        indexToEs(p3, "Brand B");
+        refreshEs();
 
         // act
         ResponseEntity<ApiResponse<ProductV1Dto.ProductListResponse>> response =
@@ -209,9 +248,13 @@ class ProductV1ApiE2ETest {
     void getProducts_sortByPriceAsc() {
         // arrange
         Brand brand = brandRepository.save(Brand.create("Sort Brand"));
-        productRepository.save(Product.create("Expensive", 5000L, 10, brand.getId()));
-        productRepository.save(Product.create("Cheap", 1000L, 10, brand.getId()));
-        productRepository.save(Product.create("Mid", 3000L, 10, brand.getId()));
+        Product p1 = productRepository.save(Product.create("Expensive", 5000L, 10, brand.getId()));
+        Product p2 = productRepository.save(Product.create("Cheap", 1000L, 10, brand.getId()));
+        Product p3 = productRepository.save(Product.create("Mid", 3000L, 10, brand.getId()));
+        indexToEs(p1, "Sort Brand");
+        indexToEs(p2, "Sort Brand");
+        indexToEs(p3, "Sort Brand");
+        refreshEs();
 
         // act
         ResponseEntity<ApiResponse<ProductV1Dto.ProductListResponse>> response =

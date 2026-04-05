@@ -17,4 +17,5 @@ public interface ProductRepository {
     void incrementLikeCount(Long productId);
     void decrementLikeCount(Long productId);
     List<Product> findTopByLikeCountDesc(int limit);
+    Page<Product> findAllPaged(Pageable pageable);
 }

@@ -46,6 +46,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         // public read-only endpoints (products, brands, categories, reviews)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/products/search/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/brands/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/brands").permitAll()
@@ -58,6 +59,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/products/*/stock").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/brands").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/categories").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/admin/**").hasRole("ADMIN")
                         // all other endpoints require authentication
                         .anyRequest().authenticated()
                 )

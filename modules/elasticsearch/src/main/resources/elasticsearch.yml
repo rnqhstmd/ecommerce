@@ -1,0 +1,6 @@
+spring:
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+    enabled: true
+    connection-timeout: 5s
+    socket-timeout: 30s

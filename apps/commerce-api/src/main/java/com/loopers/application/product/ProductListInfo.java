@@ -2,6 +2,7 @@ package com.loopers.application.product;
 
 import com.loopers.domain.product.Product;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,37 @@ public record ProductListInfo(
                 productPage.getTotalElements(),
                 productPage.getTotalPages()
         );
+    }
+
+    public static ProductListInfo ofWithTotalHits(
+            List<Product> products,
+            Map<Long, Long> likeCountMap,
+            Map<Long, Boolean> isLikedMap,
+            Pageable pageable,
+            long totalHits
+    ) {
+        List<ProductContent> contents = products.stream()
+                .map(product -> ProductContent.of(
+                        product,
+                        likeCountMap.getOrDefault(product.getId(), 0L),
+                        isLikedMap.isEmpty() ? null : isLikedMap.getOrDefault(product.getId(), false))
+                )
+                .toList();
+
+        int totalPages = pageable.getPageSize() > 0
+                ? (int) Math.ceil((double) totalHits / pageable.getPageSize())
+                : 0;
+        return new ProductListInfo(
+                contents,
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                totalHits,
+                totalPages
+        );
+    }
+
+    public static ProductListInfo empty(Pageable pageable) {
+        return new ProductListInfo(List.of(), pageable.getPageNumber(), pageable.getPageSize(), 0, 0);
     }
 
     public record ProductContent(
