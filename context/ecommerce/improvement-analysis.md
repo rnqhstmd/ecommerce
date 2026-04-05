@@ -176,7 +176,7 @@ Fallback 동작:
 ```dockerfile
 # docker/elasticsearch/Dockerfile
 FROM docker.elastic.co/elasticsearch/elasticsearch:8.17.0
-RUN bin/elasticsearch-plugin install analysis-nori
+RUN bin/elasticsearch-plugin install --batch analysis-nori
 ```
 
 Nori 플러그인을 Dockerfile에서 설치하는 방식을 선택한 이유: CI 환경에서 매번 플러그인을 다운로드하지 않고 이미지를 캐시할 수 있어 재현성과 속도 모두 확보된다.

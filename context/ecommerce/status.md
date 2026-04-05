@@ -2,7 +2,7 @@
 
 > PRD 요구사항별 구현 상태를 추적합니다.
 
-- 수정일: 2026-03-29
+- 수정일: 2026-04-05
 
 ## 범례
 
@@ -147,3 +147,62 @@
 | 전체 데이터 재인덱싱 배치 | ✅ | POST /admin/products/reindex (ADMIN 전용, 1000건 배치) |
 
 **학습 포인트**: Elasticsearch 역인덱스, Nori 한글 형태소 분석, BM25 관련도 점수, Completion Suggester, Aggregation, Application Event 기반 CDC
+
+---
+
+## 다음 Phase 후보 (Roadmap)
+
+> PR #12 머지 이후 식별된 개선 항목. PR 리뷰에서 Phase 7 범위 외로 거절한 이슈 + Phase 7 미완성 기능 + 테스트 기술 부채를 세 갈래로 분류한다.
+> 추천 진행 순서: **A → B → C** (저비용 고효과 → 운영 결함 해소 → 아키텍처 학습).
+
+### Phase 7-Extension (후보 A): ES 기능 마저 완성
+
+> 성격: 저비용 고효과. 기존 `ElasticsearchProductSearchAdapter.searchProducts()` 한 곳만 수정. 단일 PR로 묶기 권장.
+
+| 우선순위 | 요구사항 | 상태 | 상세 |
+|---------|---------|------|------|
+| P0 | 검색어 하이라이팅 | ⬜ | `highlight` 쿼리 추가, 응답 DTO에 `highlighted` 필드 추가. `<em>` 태그로 매칭 부분 강조 |
+| P0 | 오타 교정 (Fuzzy Query) | ⬜ | `multi_match`에 `.fuzziness("AUTO")` 파라미터 추가. 편집 거리 기반 유사 검색어 매칭 |
+
+**학습 포인트 예정**: ES Highlighter, Fuzzy Matching (Levenshtein distance), Query-time vs Index-time 트레이드오프
+
+---
+
+### Phase 8 (후보 B): 운영 안정성 2차
+
+> 성격: 실제 운영 결함 해소. PR #12 리뷰에서 "Phase 7 범위 외"로 거절했지만 실제 버그 성격의 이슈들.
+
+| 우선순위 | 요구사항 | 상태 | 상세 |
+|---------|---------|------|------|
+| P0 | Kafka 배치 리스너 멱등성 + DLQ | ⬜ | `OrderEventConsumer`: 배치 내 일부 실패 → ack 생략 → 중복 알림 발송 가능. `Notification` 유니크 제약 `(userId, type, orderId)` + `existsByUniqueKey` 체크. 실패 레코드 DLQ 전송 |
+| P1 | SecurityContextHelper anonymous user 처리 | ⬜ | `getCurrentUserId()`가 `AnonymousAuthenticationToken` 캐스팅 → 잘못된 userId. principal 타입 검증 + UNAUTHORIZED 던지기 |
+| P2 | Rate Limiter 알고리즘/용어 정합화 | ⬜ | 현재 `INCR + EXPIRE`는 Fixed Window지만 docs/주석은 "Sliding Window"로 표기. 문서 수정 또는 ZSET 기반 Sliding Window 재구현 |
+
+**학습 포인트 예정**: Exactly-once semantics (Kafka), Idempotency key 설계, Spring Security principal 검증, Sliding vs Fixed Window Rate Limiting
+
+---
+
+### Phase 9 (후보 C): 검색 고도화 + 무중단 배포
+
+> 성격: 아키텍처 학습 임팩트. 동의어 사전 작업과 Alias 재인덱싱 전략을 묶어서 일타쌍피.
+
+| 우선순위 | 요구사항 | 상태 | 상세 |
+|---------|---------|------|------|
+| P1 | 동의어 사전 (Synonym Filter) | ⬜ | ES `synonym` 필터 + 사전 파일 관리 ("운동화" ↔ "스니커즈" ↔ "sneakers"). 인덱스 재생성 필요 |
+| P2 | ES Alias 기반 Zero-downtime Reindexing | ⬜ | `products_v2` 생성 → 배치 인덱싱 → `products` alias 원자적 스위칭 → 기존 인덱스 삭제. 동의어 사전 적용 시 동시 진행 |
+| P2 | 인기 검색어 / 최근 검색어 | ⬜ | Redis Sorted Set (인기, 시간 감쇠) + Redis List (사용자별 최근). `SearchEventPublisher` 도입 |
+
+**학습 포인트 예정**: ES Alias 전략, Blue-Green 인덱싱, Synonym Filter, 시계열 감쇠 알고리즘, 이벤트 소싱 패턴
+
+---
+
+### 기술 부채 (상시 개선, 별도 PR로 분리 가능)
+
+> PR #12 코드 리뷰에서 식별된 latent 이슈. 기능 추가 시 함께 정리 권장.
+
+| 항목 | 위치 | 설명 |
+|------|------|------|
+| `ElasticsearchPerformanceTest.flushBatch` brand/category lookup 견고화 | `apps/commerce-api/.../search/ElasticsearchPerformanceTest.java` | `(p.getId() - 1) % length` 패턴이 AUTO_INCREMENT 리셋에 의존. `brandIdMap` reverse lookup으로 명시적 매핑 |
+| 정적 필드 기반 테스트 상태 관리 리팩터링 | `ElasticsearchPerformanceTest.java` | `static dataInitialized`, `static Map` 사용. `@TestInstance(PER_CLASS)` + 인스턴스 필드로 개선 |
+| `Thread.sleep` 기반 integration 테스트 안정화 | `ProductSearchV1ApiE2ETest`, `ProductIndexerIntegrationTest` | 현재는 안정적이지만 CI 부하 증가 시 플래키 가능. Awaitility + ES refresh 조합으로 전환 |
+| ES facets price range 하드코딩 | `ElasticsearchProductSearchAdapter.facets()` | 현재는 한국 이커머스 가격대 기준 하드코딩. 요구사항 변경 시 설정화 또는 percentile aggregation 검토 |
