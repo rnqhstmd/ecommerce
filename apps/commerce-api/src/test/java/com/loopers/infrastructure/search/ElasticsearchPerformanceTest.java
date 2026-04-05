@@ -14,6 +14,7 @@ import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
@@ -28,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@EnabledIfSystemProperty(named = "test.performance", matches = "true")
 class ElasticsearchPerformanceTest {
 
     @Autowired
@@ -92,6 +94,11 @@ class ElasticsearchPerformanceTest {
     }
 
     private void initializeData() throws IOException {
+        // -- 0) 이전 테스트 잔존 데이터 정리 (테스트 격리) --
+        databaseCleanUp.truncateAllTables();
+        brandIdMap.clear();
+        categoryIdMap.clear();
+
         // -- 1) 브랜드 10개 생성 --
         List<Brand> brands = new ArrayList<>();
         for (String brandName : BRAND_NAMES) {
@@ -112,7 +119,7 @@ class ElasticsearchPerformanceTest {
             categoryIdMap.put(category.getName(), category.getId());
         }
 
-        // -- 3) ES 인덱스 준비 --
+        // -- 3) ES 인덱스 준비 (기존 문서도 함께 제거) --
         boolean indexExists = elasticsearchClient.indices()
                 .exists(e -> e.index("products")).value();
         if (!indexExists) {
@@ -122,6 +129,7 @@ class ElasticsearchPerformanceTest {
             }
         }
         productSearchRepository.deleteAll();
+        elasticsearchClient.indices().refresh(r -> r.index("products"));
 
         // -- 4) 상품 10,000건 생성 (MySQL + ES 배치) --
         String[] brandNames = BRAND_NAMES;
@@ -129,6 +137,8 @@ class ElasticsearchPerformanceTest {
         Random random = ThreadLocalRandom.current();
 
         List<Product> productBatch = new ArrayList<>(BATCH_SIZE);
+        // 상품별 likeCount를 batch 범위 내에서 보존 (배치 저장 시점에 각 문서에 매핑)
+        List<Long> likeCountBatch = new ArrayList<>(BATCH_SIZE);
         List<ProductDocument> documentBatch = new ArrayList<>(BATCH_SIZE);
 
         for (int i = 0; i < TOTAL_PRODUCTS; i++) {
@@ -140,68 +150,22 @@ class ElasticsearchPerformanceTest {
             Long brandId = brandIdMap.get(brandName);
             Long categoryId = categoryIdMap.get(categoryName);
             long price = 30_000L + random.nextInt(270_001); // 30,000 ~ 300,000
-            int likeCount = random.nextInt(501); // 0 ~ 500
+            long likeCount = random.nextInt(501); // 0 ~ 500
 
             Product product = Product.create(productName, price, 100, brandId);
             product.updateCategoryId(categoryId);
             productBatch.add(product);
+            likeCountBatch.add(likeCount);
 
             // 배치 단위로 MySQL 저장
             if (productBatch.size() == BATCH_SIZE) {
-                List<Product> saved = productJpaRepository.saveAll(productBatch);
-
-                // 저장된 Product로 ES 문서 생성
-                for (Product p : saved) {
-                    String bName = brandNames[(int) ((p.getId() - 1) % brandNames.length)];
-                    String cName = categoryNames[(int) ((p.getId() - 1) % categoryNames.length)];
-
-                    ProductDocument doc = ProductDocument.builder()
-                            .id(p.getId())
-                            .name(p.getName())
-                            .brandId(p.getBrandId())
-                            .brandName(bName)
-                            .categoryId(p.getCategoryId())
-                            .categoryName(cName)
-                            .price(p.getPriceValue())
-                            .likeCount((long) likeCount)
-                            .createdAt(p.getCreatedAt() != null ? p.getCreatedAt().toOffsetDateTime().toString() : null)
-                            .deletedAt(null)
-                            .build();
-                    documentBatch.add(doc);
-                }
-
-                // ES 배치 저장
-                productSearchRepository.saveAll(documentBatch);
-
-                productBatch.clear();
-                documentBatch.clear();
+                flushBatch(productBatch, likeCountBatch, documentBatch, brandNames, categoryNames);
             }
         }
 
         // 남은 배치 처리
         if (!productBatch.isEmpty()) {
-            List<Product> saved = productJpaRepository.saveAll(productBatch);
-            for (Product p : saved) {
-                String bName = brandNames[(int) ((p.getId() - 1) % brandNames.length)];
-                String cName = categoryNames[(int) ((p.getId() - 1) % categoryNames.length)];
-
-                ProductDocument doc = ProductDocument.builder()
-                        .id(p.getId())
-                        .name(p.getName())
-                        .brandId(p.getBrandId())
-                        .brandName(bName)
-                        .categoryId(p.getCategoryId())
-                        .categoryName(cName)
-                        .price(p.getPriceValue())
-                        .likeCount(0L)
-                        .createdAt(p.getCreatedAt() != null ? p.getCreatedAt().toOffsetDateTime().toString() : null)
-                        .deletedAt(null)
-                        .build();
-                documentBatch.add(doc);
-            }
-            productSearchRepository.saveAll(documentBatch);
-            productBatch.clear();
-            documentBatch.clear();
+            flushBatch(productBatch, likeCountBatch, documentBatch, brandNames, categoryNames);
         }
 
         // ES 인덱스 refresh
@@ -212,6 +176,44 @@ class ElasticsearchPerformanceTest {
         long mysqlCount = productJpaRepository.count();
         assertThat(esCount).isEqualTo(TOTAL_PRODUCTS);
         assertThat(mysqlCount).isEqualTo(TOTAL_PRODUCTS);
+    }
+
+    private void flushBatch(
+            List<Product> productBatch,
+            List<Long> likeCountBatch,
+            List<ProductDocument> documentBatch,
+            String[] brandNames,
+            String[] categoryNames
+    ) {
+        List<Product> saved = productJpaRepository.saveAll(productBatch);
+
+        // 저장된 Product로 ES 문서 생성 — 상품별 likeCount를 정확히 매핑
+        for (int idx = 0; idx < saved.size(); idx++) {
+            Product p = saved.get(idx);
+            Long likeCount = likeCountBatch.get(idx);
+            String bName = brandNames[(int) ((p.getId() - 1) % brandNames.length)];
+            String cName = categoryNames[(int) ((p.getId() - 1) % categoryNames.length)];
+
+            ProductDocument doc = ProductDocument.builder()
+                    .id(p.getId())
+                    .name(p.getName())
+                    .brandId(p.getBrandId())
+                    .brandName(bName)
+                    .categoryId(p.getCategoryId())
+                    .categoryName(cName)
+                    .price(p.getPriceValue())
+                    .likeCount(likeCount)
+                    .createdAt(p.getCreatedAt() != null ? p.getCreatedAt().toOffsetDateTime().toString() : null)
+                    .deletedAt(null)
+                    .build();
+            documentBatch.add(doc);
+        }
+
+        productSearchRepository.saveAll(documentBatch);
+
+        productBatch.clear();
+        likeCountBatch.clear();
+        documentBatch.clear();
     }
 
     @AfterAll

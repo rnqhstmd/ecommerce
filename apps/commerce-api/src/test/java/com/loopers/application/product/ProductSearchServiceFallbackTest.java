@@ -6,7 +6,9 @@ import com.loopers.domain.product.ProductSearchCondition;
 import com.loopers.domain.product.ProductSearchPort;
 import com.loopers.domain.product.ProductSearchResult;
 import com.loopers.utils.DatabaseCleanUp;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +38,15 @@ class ProductSearchServiceFallbackTest {
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
+
+    @Autowired
+    private CircuitBreakerRegistry circuitBreakerRegistry;
+
+    @BeforeEach
+    void setUp() {
+        // 다른 테스트에서 CB가 OPEN 상태로 남아 이 테스트가 폴백 경로로 빠지는 플래키 현상 방지
+        circuitBreakerRegistry.getAllCircuitBreakers().forEach(cb -> cb.reset());
+    }
 
     @AfterEach
     void tearDown() {
