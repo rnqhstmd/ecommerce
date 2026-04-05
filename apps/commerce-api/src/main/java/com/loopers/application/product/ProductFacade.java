@@ -3,13 +3,12 @@ package com.loopers.application.product;
 import com.loopers.domain.like.LikeService;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductCreatedEvent;
-import com.loopers.domain.product.ProductSearchCondition;
+import com.loopers.domain.product.ProductSearchHit;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.ProductUpdatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -103,12 +102,16 @@ public class ProductFacade {
     }
 
     public ProductListInfo getProducts(ProductGetListCommand command) {
-        // Phase 1: ES에서 ID 목록 + 총 건수 조회
+        // Phase 1: ES에서 Hit 목록 + 총 건수 조회
         ProductSearchInfo searchInfo = productSearchService.search(command);
 
-        if (searchInfo.productIds().isEmpty()) {
+        if (searchInfo.hits().isEmpty()) {
             return ProductListInfo.empty(command.pageable());
         }
+
+        // hit 인덱싱: productId -> ProductSearchHit (highlight lookup)
+        Map<Long, ProductSearchHit> hitById = searchInfo.hits().stream()
+                .collect(Collectors.toMap(ProductSearchHit::productId, Function.identity()));
 
         // Phase 2: MySQL에서 상세 조회 (ES 결과 순서 보존)
         List<Product> products = productService.findProductsByIds(searchInfo.productIds());
@@ -127,7 +130,7 @@ public class ProductFacade {
 
         return ProductListInfo.ofWithTotalHits(
                 orderedProducts, likeCountMap, isLikedMap,
-                command.pageable(), searchInfo.totalHits()
+                hitById, command.pageable(), searchInfo.totalHits()
         );
     }
 }

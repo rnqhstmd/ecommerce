@@ -23,11 +23,12 @@ public interface ProductSearchPort {
 
     /**
      * 멀티필드 검색 (name, brandName, categoryName).
-     * keyword blank -> match_all.
+     * keyword blank -> match_all. keyword 존재 시 AUTO fuzziness + 하이라이트가 적용된다.
      * brandId/minPrice/maxPrice는 filter context.
      * deletedAt null만 조회.
      *
-     * @return 검색 결과 ID 목록 + 총 건수 (결과 순서 보존)
+     * @return 검색 결과 Hit 목록(productId + 필드별 하이라이트 조각) + 총 건수.
+     *         결과 순서는 보존된다. keyword가 blank이면 모든 hit의 highlights는 빈 맵이다.
      */
     ProductSearchResult searchProducts(
             String keyword,

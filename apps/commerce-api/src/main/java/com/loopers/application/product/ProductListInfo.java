@@ -1,7 +1,7 @@
 package com.loopers.application.product;
 
 import com.loopers.domain.product.Product;
-import org.springframework.data.domain.Page;
+import com.loopers.domain.product.ProductSearchHit;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
@@ -14,39 +14,28 @@ public record ProductListInfo(
         long totalElements,
         int totalPages
 ) {
-    public static ProductListInfo of(Page<Product> productPage,
-                                     Map<Long, Long> likeCountMap,
-                                     Map<Long, Boolean> isLikedMap) {
-        List<ProductContent> contents = productPage.getContent().stream()
-                .map(product -> ProductContent.of(
-                        product,
-                        likeCountMap.getOrDefault(product.getId(), 0L),
-                        isLikedMap.isEmpty() ? null : isLikedMap.getOrDefault(product.getId(), false))
-                )
-                .toList();
-
-        return new ProductListInfo(
-                contents,
-                productPage.getNumber(),
-                productPage.getSize(),
-                productPage.getTotalElements(),
-                productPage.getTotalPages()
-        );
-    }
 
     public static ProductListInfo ofWithTotalHits(
             List<Product> products,
             Map<Long, Long> likeCountMap,
             Map<Long, Boolean> isLikedMap,
+            Map<Long, ProductSearchHit> hitById,
             Pageable pageable,
             long totalHits
     ) {
         List<ProductContent> contents = products.stream()
-                .map(product -> ProductContent.of(
-                        product,
-                        likeCountMap.getOrDefault(product.getId(), 0L),
-                        isLikedMap.isEmpty() ? null : isLikedMap.getOrDefault(product.getId(), false))
-                )
+                .map(product -> {
+                    // hitById는 정상 경로에서 product.getId()를 항상 포함하므로 null은 이론적 엣지케이스.
+                    // get() + null 체크로 ProductSearchHit.empty(...) eager 생성 비용을 제거한다.
+                    ProductSearchHit hit = hitById.get(product.getId());
+                    Map<String, List<String>> highlight = hit != null ? hit.highlights() : Map.of();
+                    return ProductContent.of(
+                            product,
+                            likeCountMap.getOrDefault(product.getId(), 0L),
+                            isLikedMap.isEmpty() ? null : isLikedMap.getOrDefault(product.getId(), false),
+                            highlight
+                    );
+                })
                 .toList();
 
         int totalPages = pageable.getPageSize() > 0
@@ -71,16 +60,23 @@ public record ProductListInfo(
             Long price,
             Long brandId,
             Long likeCount,
-            Boolean isLiked
+            Boolean isLiked,
+            Map<String, List<String>> highlight
     ) {
-        public static ProductContent of(Product product, Long likeCount, Boolean isLiked) {
+        public ProductContent {
+            highlight = highlight == null ? Map.of() : Map.copyOf(highlight);
+        }
+
+        public static ProductContent of(Product product, Long likeCount, Boolean isLiked,
+                                        Map<String, List<String>> highlight) {
             return new ProductContent(
                     product.getId(),
                     product.getName(),
                     product.getPriceValue(),
                     product.getBrandId(),
                     likeCount,
-                    isLiked
+                    isLiked,
+                    highlight
             );
         }
     }
