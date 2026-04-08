@@ -123,7 +123,23 @@ public interface ProductV1ApiSpec {
             @RequestParam(defaultValue = "10") int limit
     );
 
-    @Operation(summary = "상품 목록 조회", description = "상품 목록을 페이지네이션으로 조회합니다.")
+    @Operation(
+            summary = "상품 목록 조회",
+            description = """
+                    상품 목록을 페이지네이션으로 조회합니다.
+
+                    응답의 각 항목은 `highlight: Map<String, List<String>>` 필드를 포함합니다.
+
+                    - `highlight`는 **항상 응답에 존재**하며, 매칭이 없으면 빈 객체(`{}`)입니다.
+                    - 키는 `name`, `brandName`, `categoryName` 중 매칭된 필드만 포함됩니다 (매칭 없는 키는 생략).
+                    - 값은 `<em>...</em>` 태그로 감싸진 HTML fragment 문자열 배열입니다.
+                    - **보안 가이드**: 클라이언트는 fragment를 렌더링할 때 반드시 원문 문자열을 HTML 이스케이프한 뒤
+                      `<em>` / `</em>` 태그만 화이트리스트로 복원해야 합니다. 서버는 상품명에 포함된 HTML/스크립트
+                      문자를 별도로 제거하지 않으므로, `innerHTML`로 직접 주입할 경우 XSS 위험이 발생합니다.
+                    - **데이터 노출 안내**: `highlight.brandName` / `highlight.categoryName`을 통해
+                      브랜드명과 카테고리명 원문 조각이 노출될 수 있습니다. 기존 응답 필드에는 없던 값입니다.
+                    """
+    )
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200",

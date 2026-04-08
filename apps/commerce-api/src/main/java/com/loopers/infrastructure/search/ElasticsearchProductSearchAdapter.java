@@ -6,10 +6,13 @@ import co.elastic.clients.elasticsearch._types.SortOrder;
 import co.elastic.clients.elasticsearch._types.aggregations.*;
 import co.elastic.clients.elasticsearch._types.query_dsl.*;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
+import co.elastic.clients.elasticsearch.core.search.Highlight;
+import co.elastic.clients.elasticsearch.core.search.HighlightField;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.loopers.domain.product.FacetBucket;
 import com.loopers.domain.product.PriceRangeBucket;
 import com.loopers.domain.product.ProductFacetResult;
+import com.loopers.domain.product.ProductSearchHit;
 import com.loopers.domain.product.ProductSearchResult;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductSearchPort;
@@ -21,7 +24,9 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 @ConditionalOnProperty(name = "spring.elasticsearch.enabled", havingValue = "true", matchIfMissing = true)
@@ -63,8 +68,9 @@ public class ElasticsearchProductSearchAdapter implements ProductSearchPort {
         try {
             List<Query> filters = buildFilters(brandId, minPrice, maxPrice);
 
+            boolean hasKeyword = keyword != null && !keyword.isBlank();
             Query mainQuery;
-            if (keyword == null || keyword.isBlank()) {
+            if (!hasKeyword) {
                 mainQuery = Query.of(q -> q.matchAll(m -> m));
             } else {
                 mainQuery = Query.of(q -> q
@@ -73,6 +79,7 @@ public class ElasticsearchProductSearchAdapter implements ProductSearchPort {
                                 .fields("name", "brandName", "categoryName")
                                 .type(TextQueryType.BestFields)
                                 .tieBreaker(0.3)
+                                .fuzziness("AUTO")
                         )
                 );
             }
@@ -91,6 +98,9 @@ public class ElasticsearchProductSearchAdapter implements ProductSearchPort {
                             )
                             .from(page * size)
                             .size(size);
+                        if (hasKeyword) {
+                            s.highlight(buildHighlight());
+                        }
                         if (!sortOptions.isEmpty()) {
                             s.sort(sortOptions);
                         }
@@ -99,20 +109,58 @@ public class ElasticsearchProductSearchAdapter implements ProductSearchPort {
                     ProductDocument.class
             );
 
-            List<Long> productIds = response.hits().hits().stream()
-                    .map(Hit::source)
-                    .filter(doc -> doc != null)
-                    .map(ProductDocument::getId)
+            List<ProductSearchHit> hits = response.hits().hits().stream()
+                    .filter(hit -> hit.source() != null)
+                    .map(this::toSearchHit)
                     .toList();
 
             long totalHits = response.hits().total() != null
                     ? response.hits().total().value() : 0L;
 
-            return new ProductSearchResult(productIds, totalHits);
+            return ProductSearchResult.of(hits, totalHits);
         } catch (IOException e) {
             log.error("ES 검색 실패", e);
             throw new UncheckedIOException(e);
         }
+    }
+
+    /**
+     * name/brandName/categoryName 세 필드에 대한 하이라이트 설정을 빌드한다.
+     * 매칭 단어는 {@code <em>...</em>} 태그로 감싸진다.
+     */
+    private Highlight buildHighlight() {
+        return Highlight.of(h -> h
+                .preTags("<em>")
+                .postTags("</em>")
+                .fields("name", HighlightField.of(hf -> hf))
+                .fields("brandName", HighlightField.of(hf -> hf))
+                .fields("categoryName", HighlightField.of(hf -> hf))
+        );
+    }
+
+    /**
+     * ES Hit에서 productId와 필드별 하이라이트 조각을 추출해 ProductSearchHit로 변환한다.
+     * 빈 리스트 값은 필터링하여 매칭 없는 필드 키가 남지 않도록 한다.
+     *
+     * <p><strong>호출 계약</strong>: 호출자는 {@code hit.source() != null}을 보장해야 한다.
+     * 이 메서드는 source null 체크를 수행하지 않으며, 현재 유일한 진입점은
+     * {@link #searchProducts}의 스트림에서 {@code .filter(hit -> hit.source() != null)}을
+     * 거친 후에만 호출된다.</p>
+     */
+    private ProductSearchHit toSearchHit(Hit<ProductDocument> hit) {
+        Long productId = hit.source().getId();
+        Map<String, List<String>> rawHighlight = hit.highlight();
+        if (rawHighlight == null || rawHighlight.isEmpty()) {
+            return ProductSearchHit.empty(productId);
+        }
+        Map<String, List<String>> filtered = new LinkedHashMap<>();
+        for (Map.Entry<String, List<String>> entry : rawHighlight.entrySet()) {
+            List<String> value = entry.getValue();
+            if (value != null && !value.isEmpty()) {
+                filtered.put(entry.getKey(), List.copyOf(value));
+            }
+        }
+        return ProductSearchHit.of(productId, filtered);
     }
 
     @Override

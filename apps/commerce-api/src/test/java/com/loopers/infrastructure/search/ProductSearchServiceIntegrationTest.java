@@ -1,6 +1,7 @@
 package com.loopers.infrastructure.search;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import com.loopers.domain.product.ProductSearchHit;
 import com.loopers.domain.product.ProductSearchResult;
 import com.loopers.domain.product.ProductSearchPort;
 import com.loopers.utils.DatabaseCleanUp;
@@ -68,7 +69,15 @@ class ProductSearchServiceIntegrationTest {
                         .categoryId(2L).categoryName("상의").price(45000L).likeCount(10L).build(),
                 ProductDocument.builder()
                         .id(4L).name("뉴발란스 운동화").brandId(30L).brandName("뉴발란스")
-                        .categoryId(1L).categoryName("신발").price(79000L).likeCount(7L).build()
+                        .categoryId(1L).categoryName("신발").price(79000L).likeCount(7L).build(),
+                // AC-3 검증용: 영문 상품 (Nike <-> Nile 편집거리 1, AUTO 4자 이상이므로 fuzzy 유효)
+                ProductDocument.builder()
+                        .id(5L).name("Nike Air Force 1").brandId(40L).brandName("Nike")
+                        .categoryId(1L).categoryName("신발").price(149000L).likeCount(12L).build(),
+                // AC-2 검증용: 상품명에는 브랜드명이 없고 brandName만 '아디다스'
+                ProductDocument.builder()
+                        .id(6L).name("런닝 프로 맥스").brandId(20L).brandName("아디다스")
+                        .categoryId(1L).categoryName("신발").price(99000L).likeCount(8L).build()
         );
         productSearchRepository.saveAll(documents);
 
@@ -145,8 +154,8 @@ class ProductSearchServiceIntegrationTest {
 
         // assert
         assertAll(
-                () -> assertThat(result.productIds()).hasSize(4),
-                () -> assertThat(result.totalHits()).isEqualTo(4)
+                () -> assertThat(result.productIds()).hasSize(6),
+                () -> assertThat(result.totalHits()).isEqualTo(6)
         );
     }
 
@@ -160,6 +169,107 @@ class ProductSearchServiceIntegrationTest {
         assertAll(
                 () -> assertThat(suggestions).isNotEmpty(),
                 () -> assertThat(suggestions).allMatch(name -> name.contains("나이키"))
+        );
+    }
+
+    @DisplayName("하이라이트 - '나이키' 검색 시 name 필드에 <em>나이키</em> 조각이 포함된다.")
+    @Test
+    void search_highlight_exactNameMatch_wrapsKeywordWithEmTag() {
+        // arrange & act
+        ProductSearchResult result = productSearchPort.searchProducts(
+                "나이키", null, null, null, 0, 10, Sort.unsorted()
+        );
+
+        // assert
+        assertAll(
+                () -> assertThat(result.hits()).isNotEmpty(),
+                () -> assertThat(result.hits())
+                        .anySatisfy(hit -> {
+                            assertThat(hit.highlights()).containsKey("name");
+                            assertThat(hit.highlights().get("name"))
+                                    .anyMatch(fragment -> fragment.contains("<em>") && fragment.contains("</em>"));
+                        })
+        );
+    }
+
+    @DisplayName("하이라이트 - '아디다스' 검색 시 brandName 키만 포함되고 name/categoryName 키는 생략된다.")
+    @Test
+    void search_highlight_brandOnlyMatch_omitsOtherFieldKeys() {
+        // arrange & act
+        ProductSearchResult result = productSearchPort.searchProducts(
+                "아디다스", null, null, null, 0, 10, Sort.unsorted()
+        );
+
+        // assert — 6L(상품명: "런닝 프로 맥스")은 brandName만 '아디다스'에 매칭된다.
+        // Nori가 '아디다스'를 '아디/다스'로 분해해도 상품명에 두 토큰이 없어 name 키는 생성되지 않는다.
+        assertAll(
+                () -> assertThat(result.hits()).isNotEmpty(),
+                () -> {
+                    ProductSearchHit hit = result.hits().stream()
+                            .filter(h -> h.productId().equals(6L))
+                            .findFirst()
+                            .orElseThrow();
+                    assertAll(
+                            () -> assertThat(hit.highlights()).containsKey("brandName"),
+                            () -> assertThat(hit.highlights()).doesNotContainKey("name"),
+                            () -> assertThat(hit.highlights()).doesNotContainKey("categoryName"),
+                            // Nori가 '아디다스'를 '아디/다스'로 분해하므로 fragment는
+                            // '<em>아디</em><em>다스</em>' 형태가 될 수 있다. <em> 태그를 제거한
+                            // 원문이 '아디다스'를 포함하고, <em> 태그가 실제로 감싸져 있음을 검증.
+                            () -> assertThat(hit.highlights().get("brandName"))
+                                    .anyMatch(fragment -> fragment.contains("<em>")
+                                            && fragment.contains("</em>")
+                                            && fragment.replace("<em>", "").replace("</em>", "").contains("아디다스"))
+                    );
+                }
+        );
+    }
+
+    @DisplayName("오타 관용 - 'Nile'(한 글자 오타)로 검색해도 'Nike' 관련 상품이 반환된다.")
+    @Test
+    void search_fuzziness_returnsResultsForSingleCharTypo() {
+        // arrange & act — 한글 3자 '나이크'는 AUTO 정책상 fuzzy 비활성이므로
+        // 영문 4자 'Nile'(Nike와 편집거리 1)로 AC-3 오타 관용을 검증한다.
+        ProductSearchResult result = productSearchPort.searchProducts(
+                "Nile", null, null, null, 0, 10, Sort.unsorted()
+        );
+
+        // assert
+        assertAll(
+                () -> assertThat(result.totalHits()).isGreaterThan(0),
+                () -> assertThat(result.productIds()).contains(5L)
+        );
+    }
+
+    @DisplayName("AUTO 정책 - 2자 이하 키워드는 오타 관용이 비활성화되어 정확 매칭만 동작한다.")
+    @Test
+    void search_fuzziness_shortKeyword_exactMatchOnly() {
+        // arrange & act — '신발'은 categoryName 정확 매칭 대상
+        ProductSearchResult result = productSearchPort.searchProducts(
+                "신발", null, null, null, 0, 10, Sort.unsorted()
+        );
+
+        // assert
+        assertAll(
+                () -> assertThat(result.hits()).isNotEmpty(),
+                () -> assertThat(result.hits())
+                        .anySatisfy(hit -> assertThat(hit.highlights()).containsKey("categoryName"))
+        );
+    }
+
+    @DisplayName("keyword blank - 전체 조회 시 모든 hit의 highlights는 빈 맵이다.")
+    @Test
+    void search_blankKeyword_allHitsHaveEmptyHighlights() {
+        // arrange & act
+        ProductSearchResult result = productSearchPort.searchProducts(
+                null, null, null, null, 0, 10, Sort.unsorted()
+        );
+
+        // assert
+        assertAll(
+                () -> assertThat(result.hits()).hasSize(6),
+                () -> assertThat(result.hits())
+                        .allSatisfy(hit -> assertThat(hit.highlights()).isEmpty())
         );
     }
 }

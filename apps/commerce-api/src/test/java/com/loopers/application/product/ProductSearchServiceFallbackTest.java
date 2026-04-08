@@ -3,6 +3,7 @@ package com.loopers.application.product;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductSearchCondition;
+import com.loopers.domain.product.ProductSearchHit;
 import com.loopers.domain.product.ProductSearchPort;
 import com.loopers.domain.product.ProductSearchResult;
 import com.loopers.utils.DatabaseCleanUp;
@@ -57,7 +58,10 @@ class ProductSearchServiceFallbackTest {
     @Test
     void search_callsProductSearchPort_whenEsIsHealthy() {
         // arrange
-        ProductSearchResult mockResult = new ProductSearchResult(List.of(1L, 2L), 2L);
+        ProductSearchResult mockResult = new ProductSearchResult(
+                List.of(ProductSearchHit.empty(1L), ProductSearchHit.empty(2L)),
+                2L
+        );
         doReturn(mockResult).when(productSearchPort)
                 .searchProducts(any(), any(), any(), any(), anyInt(), anyInt(), any());
 
@@ -77,7 +81,7 @@ class ProductSearchServiceFallbackTest {
         );
     }
 
-    @DisplayName("ES 예외 발생 시 fallback으로 ProductRepository.findProducts()가 호출된다.")
+    @DisplayName("ES 예외 발생 시 fallback으로 ProductRepository.findProducts()가 호출되며 모든 hits의 highlights가 빈 맵이다.")
     @Test
     void search_fallsBackToMysql_whenEsThrows() {
         // arrange
@@ -98,7 +102,9 @@ class ProductSearchServiceFallbackTest {
                         .searchProducts(any(), any(), any(), any(), anyInt(), anyInt(), any()),
                 () -> verify(productRepository, times(1))
                         .findProducts(any(ProductSearchCondition.class)),
-                () -> assertThat(result).isNotNull()
+                () -> assertThat(result).isNotNull(),
+                () -> assertThat(result.hits())
+                        .allSatisfy(hit -> assertThat(hit.highlights()).isEmpty())
         );
     }
 

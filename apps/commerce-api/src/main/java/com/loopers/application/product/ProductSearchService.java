@@ -36,7 +36,7 @@ public class ProductSearchService {
                         command.pageable().getPageSize(),
                         command.pageable().getSort()
                 );
-        return new ProductSearchInfo(result.productIds(), result.totalHits());
+        return ProductSearchInfo.from(result);
     }
 
     @CircuitBreaker(name = "elasticsearchSearch", fallbackMethod = "autocompleteFallback")
@@ -61,7 +61,7 @@ public class ProductSearchService {
         );
         Page<Product> page = productService.getProducts(condition);
         List<Long> ids = page.getContent().stream().map(Product::getId).toList();
-        return new ProductSearchInfo(ids, page.getTotalElements());
+        return ProductSearchInfo.fromIdsWithoutHighlight(ids, page.getTotalElements());
     }
 
     private List<String> autocompleteFallback(String prefix, int size, Throwable t) {

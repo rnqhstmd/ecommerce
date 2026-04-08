@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 
 import java.util.List;
+import java.util.Map;
 
 public class ProductV1Dto {
 
@@ -114,11 +115,12 @@ public class ProductV1Dto {
             Long price,
             Long brandId,
             Long likeCount,
-            Boolean isLiked
+            Boolean isLiked,
+            Map<String, List<String>> highlight
     ) {
         public static ProductContentResponse from(ProductListInfo.ProductContent content) {
             return new ProductContentResponse(content.id(), content.name(), content.price(),
-                    content.brandId(), content.likeCount(), content.isLiked());
+                    content.brandId(), content.likeCount(), content.isLiked(), content.highlight());
         }
     }
 }
