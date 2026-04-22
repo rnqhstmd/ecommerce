@@ -37,6 +37,6 @@ Phase 1~6 전체 구현 완료. Week 2 요구사항 + 확장 로드맵 6단계 �
 | 4 | 리뷰 + 쿠폰 + 알림 + 카테고리 | 선착순 동시성(Redis DECR), Kafka consumer, 계층형 모델 | ✅ 9/9 (PR #9) |
 | 5 | 운영 안정성 + 성능 최적화 | 분산 락, Rate Limiting, Circuit Breaker, Cursor Pagination | ✅ 6/6 (PR #10) |
 | 6 | Spring Security + JWT 인증/인가 | JWT Access/Refresh, RBAC, Spring Security 필터 체인 | ✅ 6/6 (PR #11) |
-| 7 | 검색 + 개인화 (Elasticsearch) | Nori 한글 형태소 분석, 역인덱스, 자동완성, Faceted Search | ✅ 7/11 (PR #12) |
+| 7 | 검색 + 개인화 (Elasticsearch) | Nori 한글 형태소 분석, 역인덱스, 자동완성, Faceted Search, 하이라이팅, Fuzzy AUTO | ✅ 9/11 (PR #12, #14) |
 
 상세: [status.md](status.md) / 도입 배경: [elasticsearch-adoption.md](elasticsearch-adoption.md)
