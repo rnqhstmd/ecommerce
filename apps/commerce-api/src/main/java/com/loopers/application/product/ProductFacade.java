@@ -110,12 +110,15 @@ public class ProductFacade {
         }
 
         // hit 인덱싱: productId -> ProductSearchHit (highlight lookup)
-        // ES 결과에서 동일 productId 중복은 정상 상황이 아니지만, 안정성을 위해 첫 번째 값을 유지하는 merge function 지정.
+        // ES 결과에서 동일 productId 중복은 인덱싱 이상 상황이다. 운영 중 감지를 위해 warn 로그로 남기고 첫 번째 값을 유지한다.
         Map<Long, ProductSearchHit> hitById = searchInfo.hits().stream()
                 .collect(Collectors.toMap(
                         ProductSearchHit::productId,
                         Function.identity(),
-                        (existing, replacement) -> existing));
+                        (existing, replacement) -> {
+                            log.warn("ES 검색 결과에 중복 productId가 포함되어 있다. 인덱싱 상태 점검 필요. productId={}", existing.productId());
+                            return existing;
+                        }));
 
         // Phase 2: MySQL에서 상세 조회 (ES 결과 순서 보존)
         List<Product> products = productService.findProductsByIds(searchInfo.productIds());
