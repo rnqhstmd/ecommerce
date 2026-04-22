@@ -64,7 +64,7 @@ public record ProductListInfo(
             Map<String, List<String>> highlight
     ) {
         public ProductContent {
-            highlight = highlight == null ? Map.of() : Map.copyOf(highlight);
+            highlight = ProductSearchHit.deepCopyHighlights(highlight);
         }
 
         public static ProductContent of(Product product, Long likeCount, Boolean isLiked,

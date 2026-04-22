@@ -52,6 +52,18 @@ class ProductSearchV1ApiE2ETest {
 
     @BeforeEach
     void setUp() throws IOException {
+        // products 인덱스가 없으면 커스텀 설정으로 생성 (ES testcontainer cold start 대비).
+        // ProductSearchServiceIntegrationTest와 동일 가드. 인덱스 미존재 시 saveAll/refresh가
+        // index_not_found_exception으로 실패하는 것을 방지한다.
+        boolean indexExists = elasticsearchClient.indices()
+                .exists(e -> e.index("products")).value();
+        if (!indexExists) {
+            try (var is = new org.springframework.core.io.ClassPathResource(
+                    "elasticsearch/products-index-settings.json").getInputStream()) {
+                elasticsearchClient.indices().create(c -> c.index("products").withJson(is));
+            }
+        }
+
         productSearchRepository.deleteAll();
         databaseCleanUp.truncateAllTables();
 
