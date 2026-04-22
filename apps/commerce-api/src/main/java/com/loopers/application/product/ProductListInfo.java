@@ -64,7 +64,20 @@ public record ProductListInfo(
             Map<String, List<String>> highlight
     ) {
         public ProductContent {
-            highlight = highlight == null ? Map.of() : Map.copyOf(highlight);
+            // 내층 리스트까지 deep copy하여 API 레이어까지 불변성을 보장한다.
+            // 호출자가 원본 리스트를 수정해도 응답 데이터는 변하지 않는다.
+            if (highlight == null || highlight.isEmpty()) {
+                highlight = Map.of();
+            } else {
+                java.util.HashMap<String, List<String>> defensiveCopy = new java.util.HashMap<>();
+                for (Map.Entry<String, List<String>> entry : highlight.entrySet()) {
+                    List<String> value = entry.getValue();
+                    if (value != null && !value.isEmpty()) {
+                        defensiveCopy.put(entry.getKey(), List.copyOf(value));
+                    }
+                }
+                highlight = Map.copyOf(defensiveCopy);
+            }
         }
 
         public static ProductContent of(Product product, Long likeCount, Boolean isLiked,

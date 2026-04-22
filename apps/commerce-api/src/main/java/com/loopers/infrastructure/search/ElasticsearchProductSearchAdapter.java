@@ -153,11 +153,13 @@ public class ElasticsearchProductSearchAdapter implements ProductSearchPort {
         if (rawHighlight == null || rawHighlight.isEmpty()) {
             return ProductSearchHit.empty(productId);
         }
-        Map<String, List<String>> filtered = new LinkedHashMap<>();
+        // ProductSearchHit의 compact constructor가 내층 List까지 deep copy 및 빈 값 필터링을 수행하므로
+        // 여기서는 순서 보장 목적 없이 단순 HashMap으로 전달한다. JSON 응답에서 키 순서는 규정되지 않는다.
+        Map<String, List<String>> filtered = new HashMap<>();
         for (Map.Entry<String, List<String>> entry : rawHighlight.entrySet()) {
             List<String> value = entry.getValue();
             if (value != null && !value.isEmpty()) {
-                filtered.put(entry.getKey(), List.copyOf(value));
+                filtered.put(entry.getKey(), value);
             }
         }
         return ProductSearchHit.of(productId, filtered);

@@ -110,8 +110,12 @@ public class ProductFacade {
         }
 
         // hit 인덱싱: productId -> ProductSearchHit (highlight lookup)
+        // ES 결과에서 동일 productId 중복은 정상 상황이 아니지만, 안정성을 위해 첫 번째 값을 유지하는 merge function 지정.
         Map<Long, ProductSearchHit> hitById = searchInfo.hits().stream()
-                .collect(Collectors.toMap(ProductSearchHit::productId, Function.identity()));
+                .collect(Collectors.toMap(
+                        ProductSearchHit::productId,
+                        Function.identity(),
+                        (existing, replacement) -> existing));
 
         // Phase 2: MySQL에서 상세 조회 (ES 결과 순서 보존)
         List<Product> products = productService.findProductsByIds(searchInfo.productIds());

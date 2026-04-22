@@ -14,7 +14,20 @@ import java.util.Map;
 public record ProductSearchHit(Long productId, Map<String, List<String>> highlights) {
 
     public ProductSearchHit {
-        highlights = highlights == null ? Map.of() : Map.copyOf(highlights);
+        // 내층 리스트까지 deep copy하여 record의 불변 계약을 완전하게 유지.
+        // 외부에서 원본 Map/List를 수정해도 이 인스턴스의 상태는 변하지 않는다.
+        if (highlights == null || highlights.isEmpty()) {
+            highlights = Map.of();
+        } else {
+            java.util.HashMap<String, List<String>> defensiveCopy = new java.util.HashMap<>();
+            for (Map.Entry<String, List<String>> entry : highlights.entrySet()) {
+                List<String> value = entry.getValue();
+                if (value != null && !value.isEmpty()) {
+                    defensiveCopy.put(entry.getKey(), List.copyOf(value));
+                }
+            }
+            highlights = Map.copyOf(defensiveCopy);
+        }
     }
 
     public static ProductSearchHit of(Long productId, Map<String, List<String>> highlights) {
