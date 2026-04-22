@@ -24,7 +24,6 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -153,16 +152,8 @@ public class ElasticsearchProductSearchAdapter implements ProductSearchPort {
         if (rawHighlight == null || rawHighlight.isEmpty()) {
             return ProductSearchHit.empty(productId);
         }
-        // ProductSearchHit의 compact constructor가 내층 List까지 deep copy 및 빈 값 필터링을 수행하므로
-        // 여기서는 순서 보장 목적 없이 단순 HashMap으로 전달한다. JSON 응답에서 키 순서는 규정되지 않는다.
-        Map<String, List<String>> filtered = new HashMap<>();
-        for (Map.Entry<String, List<String>> entry : rawHighlight.entrySet()) {
-            List<String> value = entry.getValue();
-            if (value != null && !value.isEmpty()) {
-                filtered.put(entry.getKey(), value);
-            }
-        }
-        return ProductSearchHit.of(productId, filtered);
+        // 빈 값 필터링과 deep copy는 ProductSearchHit의 compact constructor가 수행하므로 원본을 그대로 전달한다.
+        return ProductSearchHit.of(productId, rawHighlight);
     }
 
     @Override

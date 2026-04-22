@@ -1,5 +1,6 @@
 package com.loopers.domain.product;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -14,20 +15,7 @@ import java.util.Map;
 public record ProductSearchHit(Long productId, Map<String, List<String>> highlights) {
 
     public ProductSearchHit {
-        // 내층 리스트까지 deep copy하여 record의 불변 계약을 완전하게 유지.
-        // 외부에서 원본 Map/List를 수정해도 이 인스턴스의 상태는 변하지 않는다.
-        if (highlights == null || highlights.isEmpty()) {
-            highlights = Map.of();
-        } else {
-            java.util.HashMap<String, List<String>> defensiveCopy = new java.util.HashMap<>();
-            for (Map.Entry<String, List<String>> entry : highlights.entrySet()) {
-                List<String> value = entry.getValue();
-                if (value != null && !value.isEmpty()) {
-                    defensiveCopy.put(entry.getKey(), List.copyOf(value));
-                }
-            }
-            highlights = Map.copyOf(defensiveCopy);
-        }
+        highlights = deepCopyHighlights(highlights);
     }
 
     public static ProductSearchHit of(Long productId, Map<String, List<String>> highlights) {
@@ -39,5 +27,23 @@ public record ProductSearchHit(Long productId, Map<String, List<String>> highlig
      */
     public static ProductSearchHit empty(Long productId) {
         return new ProductSearchHit(productId, Map.of());
+    }
+
+    /**
+     * 하이라이트 Map을 내층 List까지 deep copy하여 불변 Map으로 반환한다.
+     * 빈 리스트를 가진 키는 제거된다. API 응답 레이어까지 공유 사용을 위해 static으로 노출한다.
+     */
+    public static Map<String, List<String>> deepCopyHighlights(Map<String, List<String>> highlights) {
+        if (highlights == null || highlights.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, List<String>> defensiveCopy = new HashMap<>();
+        for (Map.Entry<String, List<String>> entry : highlights.entrySet()) {
+            List<String> value = entry.getValue();
+            if (value != null && !value.isEmpty()) {
+                defensiveCopy.put(entry.getKey(), List.copyOf(value));
+            }
+        }
+        return Map.copyOf(defensiveCopy);
     }
 }
