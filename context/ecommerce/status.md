@@ -2,7 +2,7 @@
 
 > PRD 요구사항별 구현 상태를 추적합니다.
 
-- 수정일: 2026-04-05
+- 수정일: 2026-04-22
 
 ## 범례
 
@@ -139,9 +139,9 @@
 | ProductIndexer (MySQL → ES 동기화) | ✅ | @TransactionalEventListener(AFTER_COMMIT) 기반 실시간 동기화 |
 | 상품 검색 API (multi_match + 필터) | ✅ | ES 역인덱스 + Circuit Breaker MySQL LIKE fallback |
 | 자동완성 API (Completion Suggester) | ✅ | Edge N-gram match_phrase_prefix 기반 접두사 매칭 |
-| 검색어 하이라이팅 | ⬜ | 매칭 부분 `<em>` 태그 강조 |
+| 검색어 하이라이팅 | ✅ | PR #14 — multi_match + highlight DSL, name/brandName/categoryName 3필드, `<em>` 태그 고정, 키 생략 정책 |
 | 집계 — Faceted Search | ✅ | 브랜드별/카테고리별/가격대별 상품 수 Aggregation |
-| 오타 교정 (Fuzzy Query) | ⬜ | 편집 거리 기반 유사 검색어 매칭 |
+| 오타 교정 (Fuzzy Query) | ✅ | PR #14 — `.fuzziness("AUTO")` (0~2자 정확 매칭, 3~5자 편집거리 1, 6자↑ 편집거리 2). 한글은 Nori 형태소 분해 결과 토큰 길이에 따라 편집거리 적용 구간이 바뀔 수 있음 |
 | 동의어 사전 | ⬜ | Synonym Filter ("운동화" ↔ "스니커즈" ↔ "sneakers") |
 | 인기 검색어 / 최근 검색어 | ⬜ | ES 검색 로그 집계 + Redis 사용자별 이력 |
 | 전체 데이터 재인덱싱 배치 | ✅ | POST /admin/products/reindex (ADMIN 전용, 1000건 배치) |
@@ -155,16 +155,16 @@
 > PR #12 머지 이후 식별된 개선 항목. PR 리뷰에서 Phase 7 범위 외로 거절한 이슈 + Phase 7 미완성 기능 + 테스트 기술 부채를 세 갈래로 분류한다.
 > 추천 진행 순서: **A → B → C** (저비용 고효과 → 운영 결함 해소 → 아키텍처 학습).
 
-### Phase 7-Extension (후보 A): ES 기능 마저 완성
+### Phase 7-Extension (후보 A): ES 기능 마저 완성 ✅ (PR #14 머지)
 
-> 성격: 저비용 고효과. 기존 `ElasticsearchProductSearchAdapter.searchProducts()` 한 곳만 수정. 단일 PR로 묶기 권장.
+> 단일 PR로 저비용 고효과 목표 달성. `ElasticsearchProductSearchAdapter.searchProducts()` 한 곳 + 데이터 파이프 4레이어 DTO 필드 추가 + API 계약 보안 가이드 주석.
 
 | 우선순위 | 요구사항 | 상태 | 상세 |
 |---------|---------|------|------|
-| P0 | 검색어 하이라이팅 | ⬜ | `highlight` 쿼리 추가, 응답 DTO에 `highlighted` 필드 추가. `<em>` 태그로 매칭 부분 강조 |
-| P0 | 오타 교정 (Fuzzy Query) | ⬜ | `multi_match`에 `.fuzziness("AUTO")` 파라미터 추가. 편집 거리 기반 유사 검색어 매칭 |
+| P0 | 검색어 하이라이팅 | ✅ | `highlight` DSL 추가, `ProductContentResponse.highlight: Map<String, List<String>>` 필드 추가. `<em>` 고정 태그, 매칭 없는 필드 키 생략 정책 |
+| P0 | 오타 교정 (Fuzzy Query) | ✅ | `multi_match`에 `.fuzziness("AUTO")` 추가. AC-3 한글 3자 "나이크" 시나리오는 Nori 분해 결과 단일 토큰이 아니면 AUTO 편집거리가 적용되지 않는 한계로 영문 `Nile→Nike`(4자, 편집거리 1)로 테스트 대체 |
 
-**학습 포인트 예정**: ES Highlighter, Fuzzy Matching (Levenshtein distance), Query-time vs Index-time 트레이드오프
+**학습 포인트**: ES Highlighter + HighlightField DSL (Java Client 8.15.5 — Spring Boot 3.4.4 관리), Fuzzy AUTO 편집 거리 정책(0~2자 정확 / 3~5자 편집거리 1 / 6자↑ 편집거리 2), Nori 한글 형태소 분석기와 Fuzzy의 토큰 단위 한계, Query-time 파라미터 기반 검색 고도화 (색인 스키마 무변경), API 계약서 보안 가이드 명시화
 
 ---
 
