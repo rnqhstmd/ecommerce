@@ -36,6 +36,7 @@ public class OrderFacade {
     private final ProductService productService;
     private final CouponService couponService;
     private final ApplicationEventPublisher eventPublisher;
+    private final OrderMetrics orderMetrics;
 
     @Transactional
     public OrderInfo placeOrder(OrderPlaceCommand command) {
@@ -100,6 +101,7 @@ public class OrderFacade {
         );
         eventPublisher.publishEvent(event);
 
+        orderMetrics.orderSuccess();
         return OrderInfo.from(savedOrder);
     }
 

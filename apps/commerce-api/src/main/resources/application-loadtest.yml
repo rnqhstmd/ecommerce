@@ -1,0 +1,36 @@
+spring:
+  config:
+    activate:
+      on-profile: loadtest
+  # local 프로파일과 병행 실행(local,loadtest): datasource는 local에서, 아래 설정으로 오버라이드.
+  # ddl-auto=update로 재기동 시에도 시드 데이터를 유지(local의 create가 매번 drop하는 것 방지).
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+# 부하테스트 시 캐시 효과 측정을 위해 활성화 (default 프로파일은 false)
+cache:
+  redis:
+    enabled: true
+
+# 재고 Redis 선차감 플래그 (Phase 3 개선 전까지 false = Before)
+stock:
+  redis:
+    pre-decrement:
+      enabled: false
+
+logging:
+  level:
+    org.hibernate.SQL: WARN     # 부하 시 로그 I/O 배제
+    root: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,metrics
+
+# 8080은 Oracle TNS Listener(TNSLSNR)가 점유 → 부하테스트 앱은 8081 사용
+server:
+  port: 8081

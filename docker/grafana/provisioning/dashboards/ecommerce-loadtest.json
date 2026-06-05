@@ -1,0 +1,93 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "tags": ["loadtest", "ecommerce"],
+  "templating": { "list": [] },
+  "time": { "from": "now-15m", "to": "now" },
+  "timezone": "browser",
+  "title": "Ecommerce Load Test",
+  "uid": "ecommerce-loadtest",
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "title": "HikariCP Connections (mysql-main-pool)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "ecommerce-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2 }, "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "hikaricp_connections_active{pool=\"mysql-main-pool\"}", "legendFormat": "active" },
+        { "refId": "B", "expr": "hikaricp_connections_pending{pool=\"mysql-main-pool\"}", "legendFormat": "pending" },
+        { "refId": "C", "expr": "hikaricp_connections_idle{pool=\"mysql-main-pool\"}", "legendFormat": "idle" },
+        { "refId": "D", "expr": "hikaricp_connections_max{pool=\"mysql-main-pool\"}", "legendFormat": "max" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "HTTP Latency (p95 / p99)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "ecommerce-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "s" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket[1m])) by (le))", "legendFormat": "p95" },
+        { "refId": "B", "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket[1m])) by (le))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "HTTP Throughput (req/s)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "ecommerce-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(http_server_requests_seconds_count[1m]))", "legendFormat": "total req/s" },
+        { "refId": "B", "expr": "sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[1m]))", "legendFormat": "5xx req/s" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Order Business Metrics (req/s)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "ecommerce-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "rate(ecommerce_order_success_total[1m])", "legendFormat": "success/s" },
+        { "refId": "B", "expr": "rate(ecommerce_order_fail_total[1m])", "legendFormat": "fail/s" },
+        { "refId": "C", "expr": "rate(ecommerce_order_stock_shortage_total[1m])", "legendFormat": "stock_shortage/s" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "JVM Heap Used",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "ecommerce-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "bytes" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "sum(jvm_memory_used_bytes{area=\"heap\"})", "legendFormat": "heap used" },
+        { "refId": "B", "expr": "sum(jvm_memory_committed_bytes{area=\"heap\"})", "legendFormat": "heap committed" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "CPU Usage",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "ecommerce-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "percentunit", "max": 1 }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "process_cpu_usage", "legendFormat": "process" },
+        { "refId": "B", "expr": "system_cpu_usage", "legendFormat": "system" }
+      ]
+    }
+  ]
+}
