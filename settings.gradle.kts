@@ -1,17 +1,3 @@
-rootProject.name = "ecommerce"
-
-include(
-    ":apps:commerce-api",
-    ":apps:commerce-streamer",
-    ":modules:jpa",
-    ":modules:redis",
-    ":modules:kafka",
-    ":modules:elasticsearch",
-    ":supports:jackson",
-    ":supports:logging",
-    ":supports:monitoring",
-)
-
 // configurations
 pluginManagement {
     val springBootVersion: String by settings
@@ -32,3 +18,22 @@ pluginManagement {
         }
     }
 }
+
+// JDK 21 toolchain 자동 프로비저닝 (로컬에 21이 없을 때 Gradle이 다운로드)
+plugins {
+    id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
+}
+
+rootProject.name = "ecommerce"
+
+include(
+    ":apps:commerce-api",
+    ":apps:commerce-streamer",
+    ":modules:jpa",
+    ":modules:redis",
+    ":modules:kafka",
+    ":modules:elasticsearch",
+    ":supports:jackson",
+    ":supports:logging",
+    ":supports:monitoring",
+)
