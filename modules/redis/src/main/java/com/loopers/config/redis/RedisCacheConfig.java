@@ -1,5 +1,6 @@
 package com.loopers.config.redis;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
@@ -31,10 +32,19 @@ public class RedisCacheConfig {
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
         objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        // 엔티티의 파생 getter(getPriceValue/getStockValue 등)가 직렬화되어 JSON에 포함되지만
+        // 역직렬화 시 해당 필드가 없어 UnrecognizedPropertyException 발생 → 알 수 없는 필드 무시.
+        objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        // allowIfBaseType만 있으면 캐시 값 안의 Object 타입 필드(예: 컬렉션 요소)에 담긴
+        // com.loopers 하위 타입을 역직렬화할 때 base type이 Object라 거부된다.
+        // allowIfSubType을 함께 허용해 캐시 ON에서의 역직렬화 실패(앱 다운)를 막는다.
         PolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
                 .allowIfBaseType("com.loopers.")
+                .allowIfSubType("com.loopers.")
                 .allowIfBaseType("java.util.")
+                .allowIfSubType("java.util.")
                 .allowIfBaseType("java.time.")
+                .allowIfSubType("java.time.")
                 .build();
         objectMapper.activateDefaultTyping(ptv, ObjectMapper.DefaultTyping.NON_FINAL);
 
