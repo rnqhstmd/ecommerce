@@ -1,6 +1,7 @@
 package com.loopers.interfaces.api.product;
 
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.PageConstants;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -72,10 +73,10 @@ public interface ProductV1ApiSpec {
             @Parameter(description = "브랜드 ID 필터 (선택)")
             @RequestParam(required = false) Long brandId,
             @Parameter(description = "정렬 기준 (latest, price_asc, likes_desc)")
-            @RequestParam(defaultValue = "latest") String sort,
+            @RequestParam(defaultValue = PageConstants.DEFAULT_SORT) String sort,
             @Parameter(description = "페이지 번호 (0부터 시작)")
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = PageConstants.DEFAULT_PAGE) int page,
             @Parameter(description = "페이지 크기 (1~100)")
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = PageConstants.DEFAULT_SIZE) int size
     );
 }
