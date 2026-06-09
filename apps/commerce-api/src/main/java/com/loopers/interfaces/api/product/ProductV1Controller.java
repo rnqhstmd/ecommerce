@@ -5,6 +5,7 @@ import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductGetListCommand;
 import com.loopers.application.product.ProductListInfo;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.PageConstants;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import jakarta.validation.Valid;
@@ -48,12 +49,12 @@ public class ProductV1Controller implements ProductV1ApiSpec {
     public ApiResponse<ProductV1Dto.ProductListResponse> getProducts(
             @RequestHeader(value = "X-USER-ID", required = false) String userId,
             @RequestParam(required = false) Long brandId,
-            @RequestParam(defaultValue = "latest") String sort,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = PageConstants.DEFAULT_SORT) String sort,
+            @RequestParam(defaultValue = PageConstants.DEFAULT_PAGE) int page,
+            @RequestParam(defaultValue = PageConstants.DEFAULT_SIZE) int size
     ) {
-        if (page < 0 || size <= 0 || size > 100) {
-            throw new CoreException(ErrorType.BAD_REQUEST, "page는 0 이상, size는 1~100 이어야 합니다.");
+        if (page < 0 || size <= 0 || size > PageConstants.MAX_SIZE) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "page는 0 이상, size는 1~" + PageConstants.MAX_SIZE + " 이어야 합니다.");
         }
         String normalizedUserId = (userId == null || userId.isBlank()) ? null : userId;
         Sort sortOrder = parseSort(sort);
