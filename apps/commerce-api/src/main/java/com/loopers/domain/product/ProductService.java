@@ -55,4 +55,14 @@ public class ProductService {
     public void evictProductCache(Long id) {
         // 캐시 무효화만 수행
     }
+
+    @Transactional
+    @CacheEvict(value = "product", key = "#productId")
+    public void applyLikeDelta(Long productId, int delta) {
+        if (delta > 0) {
+            productRepository.incrementLikeCount(productId);
+        } else {
+            productRepository.decrementLikeCount(productId);
+        }
+    }
 }
