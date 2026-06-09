@@ -93,9 +93,10 @@ subprojects {
         systemProperty("user.timezone", "Asia/Seoul")
         systemProperty("spring.profiles.active", "test")
         jvmArgs("-Xshare:off")
-        // Testcontainers Docker Desktop 29.x 호환: DOCKER_HOST를 raw socket으로 지정
-        // Docker Desktop 업데이트 또는 Testcontainers 호환 패치 후 제거 가능
-        environment("DOCKER_HOST", "unix:///Users/bonseung/Library/Containers/com.docker.docker/Data/docker.raw.sock")
+        // Testcontainers Docker 연결: 환경에 DOCKER_HOST가 설정된 경우에만 전달한다.
+        // 미설정 시 Testcontainers가 OS별 기본 Docker 컨텍스트를 자동 탐지한다
+        // (Windows: npipe, macOS/Linux: unix socket). 특정 개발자 머신 경로 하드코딩 제거.
+        System.getenv("DOCKER_HOST")?.let { environment("DOCKER_HOST", it) }
     }
 
     tasks.withType<JacocoReport> {
